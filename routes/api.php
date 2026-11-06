@@ -1,21 +1,19 @@
 <?php
 
-use App\Http\Controllers\CategoriaApiController;
+use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\DesguaceApiController;
 use App\Http\Controllers\EstanteriaApiController;
 use App\Http\Controllers\EtiquetaApiController;
-use App\Http\Controllers\ModuloApiController;
-use App\Http\Controllers\MovimientoApiController;
-use App\Http\Controllers\PatioApiController;
-use App\Http\Controllers\PiezaApiController;
-use App\Http\Controllers\RegistroSistemaApiController;
-use App\Http\Controllers\RolApiController;
-use App\Http\Controllers\SectorApiController;
-use App\Http\Controllers\TipoPiezaApiController;
 use App\Http\Controllers\UbicacionVehiculoApiController;
-use App\Http\Controllers\UsuarioApiController;
+use App\Http\Controllers\RegistroSistemaApiController;
+
 use App\Http\Controllers\VehiculoApiController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CategoriaApiController;
+use App\Http\Controllers\TipoPiezaApiController;
+use App\Http\Controllers\PiezaApiController;
+use App\Http\Controllers\MovimientoApiController;
+
 
 // CRUD DESGUACE
 Route::apiResource('desguaces', DesguaceApiController::class);
@@ -32,10 +30,3 @@ Route::apiResource('categorias', CategoriaApiController::class);
 Route::apiResource('tipo_piezas', TipoPiezaApiController::class);
 Route::apiResource('piezas', PiezaApiController::class);
 Route::apiResource('movimientos', MovimientoApiController::class);
-
-// CRUD MÓDULOS, PATIOS, SECTORES, ROLES Y USUARIOS
-Route::apiResource('modulos', ModuloApiController::class);
-Route::apiResource('patios', PatioApiController::class);
-Route::apiResource('sectores', SectorApiController::class);
-Route::apiResource('roles', RolApiController::class);
-Route::apiResource('usuarios', UsuarioApiController::class);
