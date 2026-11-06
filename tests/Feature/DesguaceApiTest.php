@@ -3,19 +3,19 @@
 namespace Tests\Feature;
 
 use App\Models\Desguace;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class DesguaceApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     private array $datosValidos = [
         'nombre' => 'Desguace Prueba',
         'direccion' => 'Calle Falsa 123',
         'numero_telefono' => '600111222',
-        'ubicacion' => 'Sevilla'
+        'ubicacion' => 'Sevilla',
     ];
 
     public function test_index_devuelve_los_desguaces(): void
@@ -32,7 +32,7 @@ class DesguaceApiTest extends TestCase
     {
         $desguace = Desguace::factory()->create();
 
-        $this->getJson('/api/desguaces/' . $desguace->id)
+        $this->getJson('/api/desguaces/'.$desguace->id)
             ->assertOk()
             ->assertJsonPath('data.nombre', $desguace->nombre);
     }
@@ -57,7 +57,7 @@ class DesguaceApiTest extends TestCase
     {
         $desguace = Desguace::factory()->create();
 
-        $this->putJson('/api/desguaces/' . $desguace->id, $this->datosValidos)
+        $this->putJson('/api/desguaces/'.$desguace->id, $this->datosValidos)
             ->assertOk()
             ->assertJsonPath('data.ubicacion', 'Sevilla');
     }
@@ -66,7 +66,7 @@ class DesguaceApiTest extends TestCase
     {
         $desguace = Desguace::factory()->create();
 
-        $this->patchJson('/api/desguaces/' . $desguace->id, ['ubicacion' => 'Madrid'])
+        $this->patchJson('/api/desguaces/'.$desguace->id, ['ubicacion' => 'Madrid'])
             ->assertOk()
             ->assertJsonPath('data.ubicacion', 'Madrid');
     }
@@ -75,7 +75,7 @@ class DesguaceApiTest extends TestCase
     {
         $desguace = Desguace::factory()->create();
 
-        $this->deleteJson('/api/desguaces/' . $desguace->id)
+        $this->deleteJson('/api/desguaces/'.$desguace->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

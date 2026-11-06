@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Estanteria;
 use App\Models\Etiqueta;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class EtiquetaApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_las_etiquetas(): void
     {
@@ -28,7 +28,7 @@ class EtiquetaApiTest extends TestCase
 
         $this->postJson('/api/etiquetas', [
             'estanteria_id' => $estanteria->id,
-            'numero_etiqueta' => 15
+            'numero_etiqueta' => 15,
         ])
             ->assertCreated()
             ->assertJsonPath('data.estanteria_id', $estanteria->id);
@@ -41,7 +41,7 @@ class EtiquetaApiTest extends TestCase
 
         $this->postJson('/api/etiquetas', [
             'estanteria_id' => $estanteria->id,
-            'numero_etiqueta' => 3
+            'numero_etiqueta' => 3,
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['numero_etiqueta']);
     }
@@ -50,7 +50,7 @@ class EtiquetaApiTest extends TestCase
     {
         $this->postJson('/api/etiquetas', [
             'estanteria_id' => 999999,
-            'numero_etiqueta' => 1
+            'numero_etiqueta' => 1,
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['estanteria_id']);
     }
@@ -59,9 +59,9 @@ class EtiquetaApiTest extends TestCase
     {
         $etiqueta = Etiqueta::factory()->create();
 
-        $this->putJson('/api/etiquetas/' . $etiqueta->id, [
+        $this->putJson('/api/etiquetas/'.$etiqueta->id, [
             'estanteria_id' => $etiqueta->estanteria_id,
-            'numero_etiqueta' => 500
+            'numero_etiqueta' => 500,
         ])->assertOk()
             ->assertJsonPath('data.numero_etiqueta', 500);
     }
@@ -70,7 +70,7 @@ class EtiquetaApiTest extends TestCase
     {
         $etiqueta = Etiqueta::factory()->create();
 
-        $this->deleteJson('/api/etiquetas/' . $etiqueta->id)
+        $this->deleteJson('/api/etiquetas/'.$etiqueta->id)
             ->assertOk();
 
         $this->assertDatabaseMissing('etiquetas', ['id' => $etiqueta->id]);

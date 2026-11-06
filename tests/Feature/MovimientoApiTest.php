@@ -3,18 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\Movimiento;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MovimientoApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     private array $datosValidos = [
         'tipo_movimiento' => 'Entrada',
         'fecha' => '2026-10-01',
-        'cantidad' => 5
+        'cantidad' => 5,
     ];
 
     public function test_index_devuelve_los_movimientos(): void
@@ -31,7 +31,7 @@ class MovimientoApiTest extends TestCase
     {
         $movimiento = Movimiento::factory()->create();
 
-        $this->getJson('/api/movimientos/' . $movimiento->id)
+        $this->getJson('/api/movimientos/'.$movimiento->id)
             ->assertOk()
             ->assertJsonPath('data.tipo_movimiento', $movimiento->tipo_movimiento);
     }
@@ -56,7 +56,7 @@ class MovimientoApiTest extends TestCase
     {
         $movimiento = Movimiento::factory()->create();
 
-        $this->putJson('/api/movimientos/' . $movimiento->id, $this->datosValidos)
+        $this->putJson('/api/movimientos/'.$movimiento->id, $this->datosValidos)
             ->assertOk()
             ->assertJsonPath('data.cantidad', 5);
     }
@@ -65,7 +65,7 @@ class MovimientoApiTest extends TestCase
     {
         $movimiento = Movimiento::factory()->create();
 
-        $this->patchJson('/api/movimientos/' . $movimiento->id, ['tipo_movimiento' => 'Salida'])
+        $this->patchJson('/api/movimientos/'.$movimiento->id, ['tipo_movimiento' => 'Salida'])
             ->assertOk()
             ->assertJsonPath('data.tipo_movimiento', 'Salida');
     }
@@ -74,7 +74,7 @@ class MovimientoApiTest extends TestCase
     {
         $movimiento = Movimiento::factory()->create();
 
-        $this->deleteJson('/api/movimientos/' . $movimiento->id)
+        $this->deleteJson('/api/movimientos/'.$movimiento->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

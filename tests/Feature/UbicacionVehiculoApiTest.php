@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\UbicacionVehiculo;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class UbicacionVehiculoApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_las_ubicaciones(): void
     {
@@ -26,7 +26,7 @@ class UbicacionVehiculoApiTest extends TestCase
         $this->postJson('/api/ubicaciones-vehiculo', [
             'vehiculo_id' => 900,
             'nivel_id' => 900,
-            'fecha_inicio' => '2026-11-01 10:00:00'
+            'fecha_inicio' => '2026-11-01 10:00:00',
         ])
             ->assertCreated()
             ->assertJsonPath('data.vehiculo_id', 900);
@@ -38,13 +38,13 @@ class UbicacionVehiculoApiTest extends TestCase
             'vehiculo_id' => 901,
             'nivel_id' => 901,
             'fecha_inicio' => '2026-11-01 10:00:00',
-            'fecha_fin' => null
+            'fecha_fin' => null,
         ]);
 
         $this->postJson('/api/ubicaciones-vehiculo', [
             'vehiculo_id' => 901,
             'nivel_id' => 902,
-            'fecha_inicio' => '2026-11-02 10:00:00'
+            'fecha_inicio' => '2026-11-02 10:00:00',
         ])->assertStatus(422)
             ->assertJsonPath('success', 0);
     }
@@ -55,13 +55,13 @@ class UbicacionVehiculoApiTest extends TestCase
             'vehiculo_id' => 911,
             'nivel_id' => 911,
             'fecha_inicio' => '2026-11-01 10:00:00',
-            'fecha_fin' => null
+            'fecha_fin' => null,
         ]);
 
         $this->postJson('/api/ubicaciones-vehiculo', [
             'vehiculo_id' => 912,
             'nivel_id' => 911,
-            'fecha_inicio' => '2026-11-02 10:00:00'
+            'fecha_inicio' => '2026-11-02 10:00:00',
         ])->assertStatus(422);
     }
 
@@ -71,14 +71,14 @@ class UbicacionVehiculoApiTest extends TestCase
             'vehiculo_id' => 921,
             'nivel_id' => 921,
             'fecha_inicio' => '2026-11-01 10:00:00',
-            'fecha_fin' => null
+            'fecha_fin' => null,
         ]);
 
         $this->postJson('/api/ubicaciones-vehiculo', [
             'vehiculo_id' => 921,
             'nivel_id' => 922,
             'fecha_inicio' => '2026-10-01 10:00:00',
-            'fecha_fin' => '2026-10-15 10:00:00'
+            'fecha_fin' => '2026-10-15 10:00:00',
         ])->assertCreated();
     }
 
@@ -88,7 +88,7 @@ class UbicacionVehiculoApiTest extends TestCase
             'vehiculo_id' => 931,
             'nivel_id' => 931,
             'fecha_inicio' => '2026-11-02 10:00:00',
-            'fecha_fin' => '2026-11-01 10:00:00'
+            'fecha_fin' => '2026-11-01 10:00:00',
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['fecha_fin']);
     }
@@ -97,7 +97,7 @@ class UbicacionVehiculoApiTest extends TestCase
     {
         $ubicacion = UbicacionVehiculo::factory()->create();
 
-        $this->deleteJson('/api/ubicaciones-vehiculo/' . $ubicacion->id)
+        $this->deleteJson('/api/ubicaciones-vehiculo/'.$ubicacion->id)
             ->assertOk();
 
         $this->assertDatabaseMissing('ubicaciones_vehiculo', ['id' => $ubicacion->id]);

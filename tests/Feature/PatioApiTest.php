@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Desguace;
 use App\Models\Patio;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PatioApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_los_patios(): void
     {
@@ -26,7 +26,7 @@ class PatioApiTest extends TestCase
     {
         $patio = Patio::factory()->create();
 
-        $this->getJson('/api/patios/' . $patio->id)
+        $this->getJson('/api/patios/'.$patio->id)
             ->assertOk()
             ->assertJsonPath('data.nombre', $patio->nombre);
     }
@@ -38,7 +38,7 @@ class PatioApiTest extends TestCase
         $this->postJson('/api/patios', [
             'desguace_id' => $desguace->id,
             'codigo' => 'P-01',
-            'nombre' => 'Patio Norte'
+            'nombre' => 'Patio Norte',
         ])
             ->assertCreated()
             ->assertJsonPath('data.desguace_id', $desguace->id);
@@ -57,10 +57,10 @@ class PatioApiTest extends TestCase
     {
         $patio = Patio::factory()->create();
 
-        $this->putJson('/api/patios/' . $patio->id, [
+        $this->putJson('/api/patios/'.$patio->id, [
             'desguace_id' => $patio->desguace_id,
             'codigo' => 'P-02',
-            'nombre' => 'Patio Sur'
+            'nombre' => 'Patio Sur',
         ])
             ->assertOk()
             ->assertJsonPath('data.codigo', 'P-02');
@@ -70,7 +70,7 @@ class PatioApiTest extends TestCase
     {
         $patio = Patio::factory()->create();
 
-        $this->patchJson('/api/patios/' . $patio->id, ['nombre' => 'Patio Este'])
+        $this->patchJson('/api/patios/'.$patio->id, ['nombre' => 'Patio Este'])
             ->assertOk()
             ->assertJsonPath('data.nombre', 'Patio Este');
     }
@@ -79,7 +79,7 @@ class PatioApiTest extends TestCase
     {
         $patio = Patio::factory()->create();
 
-        $this->deleteJson('/api/patios/' . $patio->id)
+        $this->deleteJson('/api/patios/'.$patio->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

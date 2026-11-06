@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Vehiculo;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class VehiculoApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     private array $datosValidos = [
         'matricula' => '1234ABC',
@@ -17,7 +17,7 @@ class VehiculoApiTest extends TestCase
         'modelo' => 'Leon',
         'fecha_llegada' => '2026-10-01',
         'numero_bastidor' => 'VIN123456789',
-        'estado_tratamiento' => 'Pendiente'
+        'estado_tratamiento' => 'Pendiente',
     ];
 
     public function test_index_devuelve_los_vehiculos(): void
@@ -34,7 +34,7 @@ class VehiculoApiTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create();
 
-        $this->getJson('/api/vehiculos/' . $vehiculo->id)
+        $this->getJson('/api/vehiculos/'.$vehiculo->id)
             ->assertOk()
             ->assertJsonPath('data.matricula', $vehiculo->matricula);
     }
@@ -59,7 +59,7 @@ class VehiculoApiTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create();
 
-        $this->putJson('/api/vehiculos/' . $vehiculo->id, $this->datosValidos)
+        $this->putJson('/api/vehiculos/'.$vehiculo->id, $this->datosValidos)
             ->assertOk()
             ->assertJsonPath('data.marca', 'Seat');
     }
@@ -68,7 +68,7 @@ class VehiculoApiTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create();
 
-        $this->patchJson('/api/vehiculos/' . $vehiculo->id, ['estado_tratamiento' => 'Tratado'])
+        $this->patchJson('/api/vehiculos/'.$vehiculo->id, ['estado_tratamiento' => 'Tratado'])
             ->assertOk()
             ->assertJsonPath('data.estado_tratamiento', 'Tratado');
     }
@@ -77,7 +77,7 @@ class VehiculoApiTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create();
 
-        $this->deleteJson('/api/vehiculos/' . $vehiculo->id)
+        $this->deleteJson('/api/vehiculos/'.$vehiculo->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

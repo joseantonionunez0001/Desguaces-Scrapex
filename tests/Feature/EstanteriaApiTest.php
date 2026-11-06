@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Estanteria;
 use App\Models\Etiqueta;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class EstanteriaApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_las_estanterias(): void
     {
@@ -42,7 +42,7 @@ class EstanteriaApiTest extends TestCase
     {
         $estanteria = Estanteria::factory()->create();
 
-        $this->patchJson('/api/estanterias/' . $estanteria->id, ['numero_estanteria' => 42])
+        $this->patchJson('/api/estanterias/'.$estanteria->id, ['numero_estanteria' => 42])
             ->assertOk()
             ->assertJsonPath('data.numero_estanteria', 42);
     }
@@ -52,7 +52,7 @@ class EstanteriaApiTest extends TestCase
         $estanteria = Estanteria::factory()->create();
         Etiqueta::factory()->create(['estanteria_id' => $estanteria->id]);
 
-        $this->deleteJson('/api/estanterias/' . $estanteria->id)
+        $this->deleteJson('/api/estanterias/'.$estanteria->id)
             ->assertStatus(409)
             ->assertJsonPath('success', 0);
 
@@ -63,7 +63,7 @@ class EstanteriaApiTest extends TestCase
     {
         $estanteria = Estanteria::factory()->create();
 
-        $this->deleteJson('/api/estanterias/' . $estanteria->id)
+        $this->deleteJson('/api/estanterias/'.$estanteria->id)
             ->assertOk();
 
         $this->assertDatabaseMissing('estanterias', ['id' => $estanteria->id]);

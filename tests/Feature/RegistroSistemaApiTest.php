@@ -3,13 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\RegistroSistema;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class RegistroSistemaApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_los_registros(): void
     {
@@ -40,7 +40,7 @@ class RegistroSistemaApiTest extends TestCase
     {
         $registro = RegistroSistema::factory()->create();
 
-        $this->putJson('/api/registros-sistema/' . $registro->id, ['fecha_hora' => '2026-01-01 00:00:00'])
+        $this->putJson('/api/registros-sistema/'.$registro->id, ['fecha_hora' => '2026-01-01 00:00:00'])
             ->assertOk()
             ->assertJsonPath('success', 1);
     }
@@ -49,7 +49,7 @@ class RegistroSistemaApiTest extends TestCase
     {
         $registro = RegistroSistema::factory()->create();
 
-        $this->deleteJson('/api/registros-sistema/' . $registro->id)
+        $this->deleteJson('/api/registros-sistema/'.$registro->id)
             ->assertOk();
 
         $this->assertDatabaseMissing('registros_sistema', ['id' => $registro->id]);

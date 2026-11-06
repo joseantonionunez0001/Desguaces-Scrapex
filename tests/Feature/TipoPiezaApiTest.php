@@ -3,18 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\TipoPieza;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class TipoPiezaApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     private array $datosValidos = [
         'nombre' => 'Puerta delantera',
         'categoria' => 'Carroceria',
-        'fabricante' => 'Seat'
+        'fabricante' => 'Seat',
     ];
 
     public function test_index_devuelve_los_tipos_de_pieza(): void
@@ -31,7 +31,7 @@ class TipoPiezaApiTest extends TestCase
     {
         $tipoPieza = TipoPieza::factory()->create();
 
-        $this->getJson('/api/tipo_piezas/' . $tipoPieza->id)
+        $this->getJson('/api/tipo_piezas/'.$tipoPieza->id)
             ->assertOk()
             ->assertJsonPath('data.nombre', $tipoPieza->nombre);
     }
@@ -56,7 +56,7 @@ class TipoPiezaApiTest extends TestCase
     {
         $tipoPieza = TipoPieza::factory()->create();
 
-        $this->putJson('/api/tipo_piezas/' . $tipoPieza->id, $this->datosValidos)
+        $this->putJson('/api/tipo_piezas/'.$tipoPieza->id, $this->datosValidos)
             ->assertOk()
             ->assertJsonPath('data.fabricante', 'Seat');
     }
@@ -65,7 +65,7 @@ class TipoPiezaApiTest extends TestCase
     {
         $tipoPieza = TipoPieza::factory()->create();
 
-        $this->patchJson('/api/tipo_piezas/' . $tipoPieza->id, ['fabricante' => 'Renault'])
+        $this->patchJson('/api/tipo_piezas/'.$tipoPieza->id, ['fabricante' => 'Renault'])
             ->assertOk()
             ->assertJsonPath('data.fabricante', 'Renault');
     }
@@ -74,7 +74,7 @@ class TipoPiezaApiTest extends TestCase
     {
         $tipoPieza = TipoPieza::factory()->create();
 
-        $this->deleteJson('/api/tipo_piezas/' . $tipoPieza->id)
+        $this->deleteJson('/api/tipo_piezas/'.$tipoPieza->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

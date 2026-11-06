@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Patio;
 use App\Models\Sector;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class SectorApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_los_sectores(): void
     {
@@ -26,7 +26,7 @@ class SectorApiTest extends TestCase
     {
         $sector = Sector::factory()->create();
 
-        $this->getJson('/api/sectores/' . $sector->id)
+        $this->getJson('/api/sectores/'.$sector->id)
             ->assertOk()
             ->assertJsonPath('data.codigo', $sector->codigo);
     }
@@ -38,7 +38,7 @@ class SectorApiTest extends TestCase
         $this->postJson('/api/sectores', [
             'patio_id' => $patio->id,
             'codigo' => 'S-01',
-            'tipo_zona' => 'Turismos'
+            'tipo_zona' => 'Turismos',
         ])
             ->assertCreated()
             ->assertJsonPath('data.patio_id', $patio->id);
@@ -57,10 +57,10 @@ class SectorApiTest extends TestCase
     {
         $sector = Sector::factory()->create();
 
-        $this->putJson('/api/sectores/' . $sector->id, [
+        $this->putJson('/api/sectores/'.$sector->id, [
             'patio_id' => $sector->patio_id,
             'codigo' => 'S-02',
-            'tipo_zona' => 'Pesados'
+            'tipo_zona' => 'Pesados',
         ])
             ->assertOk()
             ->assertJsonPath('data.tipo_zona', 'Pesados');
@@ -70,7 +70,7 @@ class SectorApiTest extends TestCase
     {
         $sector = Sector::factory()->create();
 
-        $this->patchJson('/api/sectores/' . $sector->id, ['tipo_zona' => 'Furgonetas'])
+        $this->patchJson('/api/sectores/'.$sector->id, ['tipo_zona' => 'Furgonetas'])
             ->assertOk()
             ->assertJsonPath('data.tipo_zona', 'Furgonetas');
     }
@@ -79,7 +79,7 @@ class SectorApiTest extends TestCase
     {
         $sector = Sector::factory()->create();
 
-        $this->deleteJson('/api/sectores/' . $sector->id)
+        $this->deleteJson('/api/sectores/'.$sector->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

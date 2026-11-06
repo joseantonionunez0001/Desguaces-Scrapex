@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Desguace;
 use App\Models\Modulo;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ModuloApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     public function test_index_devuelve_los_modulos(): void
     {
@@ -26,7 +26,7 @@ class ModuloApiTest extends TestCase
     {
         $modulo = Modulo::factory()->create();
 
-        $this->getJson('/api/modulos/' . $modulo->id)
+        $this->getJson('/api/modulos/'.$modulo->id)
             ->assertOk()
             ->assertJsonPath('data.nombre_modulo', $modulo->nombre_modulo);
     }
@@ -37,7 +37,7 @@ class ModuloApiTest extends TestCase
 
         $this->postJson('/api/modulos', [
             'nombre_modulo' => 'Modulo A1',
-            'desguace_id' => $desguace->id
+            'desguace_id' => $desguace->id,
         ])
             ->assertCreated()
             ->assertJsonPath('data.desguace_id', $desguace->id);
@@ -56,7 +56,7 @@ class ModuloApiTest extends TestCase
     {
         $this->postJson('/api/modulos', [
             'nombre_modulo' => 'Modulo A1',
-            'desguace_id' => 999999
+            'desguace_id' => 999999,
         ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['desguace_id']);
@@ -67,9 +67,9 @@ class ModuloApiTest extends TestCase
         $modulo = Modulo::factory()->create();
         $desguace = Desguace::factory()->create();
 
-        $this->putJson('/api/modulos/' . $modulo->id, [
+        $this->putJson('/api/modulos/'.$modulo->id, [
             'nombre_modulo' => 'Modulo B2',
-            'desguace_id' => $desguace->id
+            'desguace_id' => $desguace->id,
         ])
             ->assertOk()
             ->assertJsonPath('data.nombre_modulo', 'Modulo B2');
@@ -79,7 +79,7 @@ class ModuloApiTest extends TestCase
     {
         $modulo = Modulo::factory()->create();
 
-        $this->patchJson('/api/modulos/' . $modulo->id, ['nombre_modulo' => 'Modulo C3'])
+        $this->patchJson('/api/modulos/'.$modulo->id, ['nombre_modulo' => 'Modulo C3'])
             ->assertOk()
             ->assertJsonPath('data.nombre_modulo', 'Modulo C3');
     }
@@ -88,7 +88,7 @@ class ModuloApiTest extends TestCase
     {
         $modulo = Modulo::factory()->create();
 
-        $this->deleteJson('/api/modulos/' . $modulo->id)
+        $this->deleteJson('/api/modulos/'.$modulo->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

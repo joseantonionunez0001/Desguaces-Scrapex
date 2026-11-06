@@ -3,16 +3,16 @@
 namespace Tests\Feature;
 
 use App\Models\Categoria;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class CategoriaApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     private array $datosValidos = [
-        'nombre' => 'Motor'
+        'nombre' => 'Motor',
     ];
 
     public function test_index_devuelve_las_categorias(): void
@@ -29,7 +29,7 @@ class CategoriaApiTest extends TestCase
     {
         $categoria = Categoria::factory()->create();
 
-        $this->getJson('/api/categorias/' . $categoria->id)
+        $this->getJson('/api/categorias/'.$categoria->id)
             ->assertOk()
             ->assertJsonPath('data.nombre', $categoria->nombre);
     }
@@ -54,7 +54,7 @@ class CategoriaApiTest extends TestCase
     {
         $categoria = Categoria::factory()->create();
 
-        $this->putJson('/api/categorias/' . $categoria->id, $this->datosValidos)
+        $this->putJson('/api/categorias/'.$categoria->id, $this->datosValidos)
             ->assertOk()
             ->assertJsonPath('data.nombre', 'Motor');
     }
@@ -63,7 +63,7 @@ class CategoriaApiTest extends TestCase
     {
         $categoria = Categoria::factory()->create();
 
-        $this->patchJson('/api/categorias/' . $categoria->id, ['nombre' => 'Carroceria'])
+        $this->patchJson('/api/categorias/'.$categoria->id, ['nombre' => 'Carroceria'])
             ->assertOk()
             ->assertJsonPath('data.nombre', 'Carroceria');
     }
@@ -72,7 +72,7 @@ class CategoriaApiTest extends TestCase
     {
         $categoria = Categoria::factory()->create();
 
-        $this->deleteJson('/api/categorias/' . $categoria->id)
+        $this->deleteJson('/api/categorias/'.$categoria->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

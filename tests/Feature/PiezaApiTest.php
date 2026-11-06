@@ -3,20 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\Pieza;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class PiezaApiTest extends TestCase
 {
-    // Revierte los cambios de cada prueba sin recrear tablas ni borrar datos.
-    use DatabaseTransactions;
+    // Recrea las tablas en la base de tests antes de cada prueba.
+    use RefreshDatabase;
 
     private array $datosValidos = [
         'nombre' => 'Puerta',
         'precio' => 45.5,
         'estado' => 'Usada',
         'stock' => 3,
-        'stock_minimo' => 1
+        'stock_minimo' => 1,
     ];
 
     public function test_index_devuelve_las_piezas(): void
@@ -33,7 +33,7 @@ class PiezaApiTest extends TestCase
     {
         $pieza = Pieza::factory()->create();
 
-        $this->getJson('/api/piezas/' . $pieza->id)
+        $this->getJson('/api/piezas/'.$pieza->id)
             ->assertOk()
             ->assertJsonPath('data.nombre', $pieza->nombre);
     }
@@ -65,7 +65,7 @@ class PiezaApiTest extends TestCase
     {
         $pieza = Pieza::factory()->create();
 
-        $this->putJson('/api/piezas/' . $pieza->id, $this->datosValidos)
+        $this->putJson('/api/piezas/'.$pieza->id, $this->datosValidos)
             ->assertOk()
             ->assertJsonPath('data.estado', 'Usada');
     }
@@ -74,7 +74,7 @@ class PiezaApiTest extends TestCase
     {
         $pieza = Pieza::factory()->create();
 
-        $this->patchJson('/api/piezas/' . $pieza->id, ['stock' => 10])
+        $this->patchJson('/api/piezas/'.$pieza->id, ['stock' => 10])
             ->assertOk()
             ->assertJsonPath('data.stock', 10);
     }
@@ -83,7 +83,7 @@ class PiezaApiTest extends TestCase
     {
         $pieza = Pieza::factory()->create();
 
-        $this->deleteJson('/api/piezas/' . $pieza->id)
+        $this->deleteJson('/api/piezas/'.$pieza->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 
