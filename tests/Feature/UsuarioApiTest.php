@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Desguace;
-use App\Models\Rol;
 use App\Models\Usuario;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
@@ -17,11 +16,10 @@ class UsuarioApiTest extends TestCase
     private function datosValidos(): array
     {
         return [
-            'rol_id' => Rol::factory()->create()->id,
             'desguace_id' => Desguace::factory()->create()->id,
             'nombre' => 'Usuario Prueba',
             'correo' => 'prueba@example.com',
-            'contrasena' => 'secreto123'
+            'contrasena' => 'secreto123',
         ];
     }
 
@@ -39,7 +37,7 @@ class UsuarioApiTest extends TestCase
     {
         $usuario = Usuario::factory()->create();
 
-        $this->getJson('/api/usuarios/' . $usuario->id)
+        $this->getJson('/api/usuarios/'.$usuario->id)
             ->assertOk()
             ->assertJsonPath('data.correo', $usuario->correo)
             ->assertJsonMissingPath('data.contrasena');
@@ -62,7 +60,7 @@ class UsuarioApiTest extends TestCase
     {
         $this->postJson('/api/usuarios', [])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['rol_id', 'desguace_id', 'nombre', 'correo', 'contrasena']);
+            ->assertJsonValidationErrors(['desguace_id', 'nombre', 'correo', 'contrasena']);
     }
 
     public function test_store_rechaza_un_correo_duplicado(): void
@@ -84,7 +82,7 @@ class UsuarioApiTest extends TestCase
         $datos = $this->datosValidos();
         $datos['correo'] = 'nuevo@example.com';
 
-        $this->putJson('/api/usuarios/' . $usuario->id, $datos)
+        $this->putJson('/api/usuarios/'.$usuario->id, $datos)
             ->assertOk()
             ->assertJsonPath('data.correo', 'nuevo@example.com');
     }
@@ -93,7 +91,7 @@ class UsuarioApiTest extends TestCase
     {
         $usuario = Usuario::factory()->create();
 
-        $this->patchJson('/api/usuarios/' . $usuario->id, ['nombre' => 'Nombre Cambiado'])
+        $this->patchJson('/api/usuarios/'.$usuario->id, ['nombre' => 'Nombre Cambiado'])
             ->assertOk()
             ->assertJsonPath('data.nombre', 'Nombre Cambiado');
     }
@@ -102,7 +100,7 @@ class UsuarioApiTest extends TestCase
     {
         $usuario = Usuario::factory()->create();
 
-        $this->deleteJson('/api/usuarios/' . $usuario->id)
+        $this->deleteJson('/api/usuarios/'.$usuario->id)
             ->assertOk()
             ->assertJsonPath('success', 1);
 

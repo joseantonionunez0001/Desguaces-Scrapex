@@ -15,7 +15,7 @@ class UsuarioApiController extends Controller
 
         return response()->json([
             'data' => $usuarios,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +26,7 @@ class UsuarioApiController extends Controller
 
         return response()->json([
             'data' => $usuario,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,11 +34,10 @@ class UsuarioApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'rol_id' => 'required|integer|exists:roles,id',
             'desguace_id' => 'required|integer|exists:desguaces,id',
             'nombre' => 'required|string|max:255',
             'correo' => 'required|string|email|max:255|unique:usuarios,correo',
-            'contrasena' => 'required|string|min:8|max:255'
+            'contrasena' => 'required|string|min:8|max:255',
         ]);
 
         $usuario = new Usuario($datos);
@@ -46,7 +45,7 @@ class UsuarioApiController extends Controller
 
         return response()->json([
             'data' => $usuario,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -57,7 +56,6 @@ class UsuarioApiController extends Controller
         $usuario = Usuario::findOrFail($id);
 
         $datos = $request->validate([
-            'rol_id' => 'sometimes|required|integer|exists:roles,id',
             'desguace_id' => 'sometimes|required|integer|exists:desguaces,id',
             'nombre' => 'sometimes|required|string|max:255',
             'correo' => [
@@ -66,9 +64,9 @@ class UsuarioApiController extends Controller
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('usuarios', 'correo')->ignore($usuario->id)
+                Rule::unique('usuarios', 'correo')->ignore($usuario->id),
             ],
-            'contrasena' => 'sometimes|required|string|min:8|max:255'
+            'contrasena' => 'sometimes|required|string|min:8|max:255',
         ]);
 
         $usuario->fill($datos);
@@ -76,7 +74,7 @@ class UsuarioApiController extends Controller
 
         return response()->json([
             'data' => $usuario,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -88,7 +86,7 @@ class UsuarioApiController extends Controller
 
         return response()->json([
             'data' => 'Usuario eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

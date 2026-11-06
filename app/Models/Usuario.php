@@ -11,18 +11,19 @@ class Usuario extends Model
     use HasFactory;
 
     protected $table = 'usuarios';
+
     protected $primaryKey = 'id';
+
     protected $fillable = [
-        'rol_id',
         'desguace_id',
         'nombre',
         'correo',
-        'contrasena'
+        'contrasena',
     ];
 
     // La contraseña nunca se devuelve en las respuestas de la API
     protected $hidden = [
-        'contrasena'
+        'contrasena',
     ];
 
     // Se cifra automáticamente al guardarla
@@ -31,12 +32,6 @@ class Usuario extends Model
         return [
             'contrasena' => 'hashed',
         ];
-    }
-
-    // Un usuario tiene un rol (N:1)
-    public function rol(): BelongsTo
-    {
-        return $this->belongsTo(Rol::class);
     }
 
     // Un usuario pertenece a un desguace (N:1)
