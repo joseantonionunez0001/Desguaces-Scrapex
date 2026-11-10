@@ -1,0 +1,15 @@
+# Archivo .htaccess para subir a /home/proyecto6.arenadaw.com.es/public_html/.htaccess
+#
+# 1. Sustituye RUTA_DEL_PROYECTO por la carpeta donde estan artisan, app y public,
+#    relativa a public_html. Ejemplo: Desguaces-Scrapex
+#    (si el proyecto esta fuera de public_html, esta regla no sirve y hay que usar la opcion de OpenLiteSpeed).
+# 2. Guarda el archivo con el nombre exacto .htaccess (sin extension .txt).
+# 3. Subelo a public_html desde el Administrador de archivos de CyberPanel.
+
+RewriteEngine On
+
+# Evita bucles si la peticion ya apunta a la carpeta public
+RewriteCond %{REQUEST_URI} !^/RUTA_DEL_PROYECTO/public/
+
+# Redirige cualquier peticion a la carpeta public del proyecto
+RewriteRule ^(.*)$ /RUTA_DEL_PROYECTO/public/$1 [L]
