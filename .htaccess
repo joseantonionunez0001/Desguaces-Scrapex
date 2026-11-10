@@ -9,7 +9,7 @@
 RewriteEngine On
 
 # Evita bucles si la peticion ya apunta a la carpeta public
-RewriteCond %{REQUEST_URI} !^/RUTA_DEL_PROYECTO/public/
+RewriteCond %{REQUEST_URI} !^/public/
 
 # Redirige cualquier peticion a la carpeta public del proyecto
-RewriteRule ^(.*)$ /RUTA_DEL_PROYECTO/public/$1 [L]
+RewriteRule ^(.*)$ /public/$1 [L]
