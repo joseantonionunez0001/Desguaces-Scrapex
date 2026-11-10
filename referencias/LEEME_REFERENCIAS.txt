@@ -1,0 +1,26 @@
+REFERENCIAS CORREGIDAS PARA KIRO IDE — TFG DESGUACE (SIN ROL MANUAL)
+
+Copia el contenido de esta carpeta "referencias" en referencias/ dentro de la raiz del proyecto Laravel.
+
+1) referencias/desguace_api/
+   Proyecto Laravel de ejemplo. Usar SOLO para observar estilo y estructura de CRUD, modelos,
+   migraciones, factories, seeders y rutas. No copiar su base de datos al proyecto.
+
+2) referencias/Desguace_EER.drawio
+   EER final actualizado: se ha ELIMINADO la entidad Rol, sus dos atributos y su
+   relacion 1:N con Usuario. Quedan 18 entidades y 21 relaciones en el diagrama.
+   Mantiene Patio, Sector, Fila, Posicion, Nivel, Ubicacion_Vehiculo y los campos
+   adicionales de Vehiculo.
+
+CRITERIO DEL PROFESOR:
+   - FASE 1: construir los CRUD del modelo de desguace. NO crear un modelo Rol propio,
+     ni tabla rol/roles manual, ni id_rol en users, ni relaciones con una entidad Rol propia.
+   - FASE 2: instalar/validar autenticacion web y Spatie Laravel Permission.
+     Spatie gestionara las tablas roles, permissions, model_has_roles,
+     model_has_permissions y role_has_permissions.
+   - El modelo User de Laravel debe ser unico y estar preparado para autenticacion.
+   - Spatie gestiona autorizacion (roles/permisos); no sustituye al login.
+
+Si el primer prompt incluye la entidad Rol o su relacion con Usuario, IGNORAR esa parte.
+Considerar el EER corregido la unica fuente actualizada sobre las entidades y relaciones.
+No inventar tablas para alcanzar un total concreto; Spatie crea tablas extra en fase 2.
