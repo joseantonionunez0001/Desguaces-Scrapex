@@ -1,0 +1,23 @@
+MENSAJE PARA KIRO ANTES DE EJECUTAR EL PRIMER PROMPT
+
+He actualizado el diagrama referencias/Desguace_EER.drawio conforme a lo que ha dicho
+el profesor: la entidad ROL no debe existir en el modelo de negocio, porque usaremos
+Spatie Laravel Permission en una fase posterior.
+
+Analiza el diagrama XML completo. Ahora contiene 18 entidades y 21 relaciones.
+No implementes modelo Rol, migracion de roles manual, RolController, RolFactory,
+RolSeeder ni campo id_rol en Usuario/User. Tampoco implementes una relacion manual
+Rol 1:N Usuario. No omitas las otras 18 entidades (incluidas Patio, Sector, Fila,
+Posicion, Nivel y Ubicacion_Vehiculo).
+
+En fase 1 construye el backend, migraciones, modelos y CRUD segun el EER corregido,
+utilizando desguace_api solamente como referencia de estilo de programacion.
+Aprovecha el User nativo de Laravel y evita crear un modelo Usuario paralelo.
+
+En fase 2, cuando te lo indique, verificaremos autenticacion de Laravel e instalaremos
+Spatie Laravel Permission; entonces se crearan roles, permisos, relaciones y seeders
+utilizando las estructuras del paquete, sin sistema manual duplicado.
+
+Si el primer prompt de abajo menciona Rol o 19 entidades/22 relaciones,
+esas partes estan OBSOLETAS: manda el diagrama corregido.
+No elimines tablas en una BD con datos sin analizar su impacto.

@@ -7,21 +7,20 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "laravel/breeze": "^2.4",
         "laravel/framework": "^13.17",
+        "laravel/sanctum": "4.3.3",
         "laravel/tinker": "^3.0",
-        "spatie/laravel-permission": "8.4.0"
+        "spatie/laravel-permission": "8.5.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
-        "laravel/boost": "^2.10",
+        "laravel/boost": "2.10.4",
         "laravel/pail": "^1.2.5",
         "laravel/pao": "^1.0.6",
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
-        "pestphp/pest": "*",
-        "pestphp/pest-plugin-laravel": "*"
+        "phpunit/phpunit": "^12.5.12"
     },
     "autoload": {
         "psr-4": {
@@ -64,6 +63,7 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
             "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [

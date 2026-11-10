@@ -2,16 +2,24 @@
 
 namespace Database\Factories;
 
+use App\Models\Sector;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @extends Factory<\App\Models\Fila>
+ */
 class FilaFactory extends Factory
 {
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
-            // Sin restricción de clave foránea hasta que exista la tabla sectores.
-            'sector_id' => fake()->numberBetween(1, 99),
-            'numero_fila' => (string) fake()->numberBetween(1, 99)
+            'id_sector' => Sector::factory(),
+            'numero_fila' => (string) fake()->numberBetween(1, 20),
         ];
     }
 }

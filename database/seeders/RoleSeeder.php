@@ -8,12 +8,25 @@ use Spatie\Permission\Models\Role;
 class RoleSeeder extends Seeder
 {
     /**
-     * Crea los roles base de la aplicación con spatie/laravel-permission.
+     * Roles del sistema. Se crean con Spatie Laravel Permission, no con una tabla propia.
      */
+    public const ADMINISTRADOR = 'administrador';
+    public const GERENTE = 'gerente';
+    public const OPERARIO = 'operario';
+
+    public const ROLES = [
+        self::ADMINISTRADOR,
+        self::GERENTE,
+        self::OPERARIO,
+    ];
+
     public function run(): void
     {
-        foreach (['admin', 'usuario'] as $roleName) {
-            Role::findOrCreate($roleName, 'web');
+        foreach (self::ROLES as $nombre) {
+            Role::firstOrCreate([
+                'name' => $nombre,
+                'guard_name' => 'web',
+            ]);
         }
     }
 }

@@ -4,25 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Fila extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'filas';
-
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_fila';
 
     protected $fillable = [
-        'sector_id',
-        'numero_fila'
+        'id_sector',
+        'numero_fila',
     ];
 
-    // Sector (1:N) se añadirá cuando exista el modelo Sector.
-
-    // Una fila tiene varias posiciones.
-    public function posiciones()
+    public function sector(): BelongsTo
     {
-        return $this->hasMany(Posicion::class);
+        return $this->belongsTo(Sector::class, 'id_sector', 'id_sector');
+    }
+
+    public function posiciones(): HasMany
+    {
+        return $this->hasMany(Posicion::class, 'id_fila');
     }
 }

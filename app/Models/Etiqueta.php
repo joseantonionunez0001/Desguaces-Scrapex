@@ -4,22 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Etiqueta extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'etiquetas';
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_etiqueta';
 
     protected $fillable = [
-        'estanteria_id',
-        'numero_etiqueta'
+        'id_estanteria',
+        'numero_etiqueta',
     ];
 
-    // Etiqueta (N) -> Estanteria (1)
-    public function estanteria()
+    public function estanteria(): BelongsTo
     {
-        return $this->belongsTo(Estanteria::class, 'estanteria_id');
+        return $this->belongsTo(Estanteria::class, 'id_estanteria', 'id_estanteria');
     }
 }

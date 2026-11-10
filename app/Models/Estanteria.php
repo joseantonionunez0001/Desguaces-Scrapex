@@ -4,24 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Estanteria extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'estanterias';
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_estanteria';
 
     protected $fillable = [
-        'pasillo_id',
-        'numero_estanteria'
+        'id_pasillo',
+        'numero_estanteria',
     ];
 
-    // Estanteria (1) -> Etiqueta (N)
-    public function etiquetas()
+    public function pasillo(): BelongsTo
     {
-        return $this->hasMany(Etiqueta::class, 'estanteria_id');
+        return $this->belongsTo(Pasillo::class, 'id_pasillo', 'id_pasillo');
     }
 
-    // Pasillo (1) -> Estanteria (N): pendiente hasta que exista el modelo Pasillo.
+    public function etiquetas(): HasMany
+    {
+        return $this->hasMany(Etiqueta::class, 'id_estanteria');
+    }
 }

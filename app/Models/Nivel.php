@@ -4,23 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Nivel extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'niveles';
-
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_nivel';
 
     protected $fillable = [
-        'posicion_id',
-        'numero_nivel'
+        'id_posicion',
+        'numero_nivel',
     ];
 
-    // Un nivel pertenece a una posición.
-    public function posicion()
+    public function posicion(): BelongsTo
     {
-        return $this->belongsTo(Posicion::class);
+        return $this->belongsTo(Posicion::class, 'id_posicion', 'id_posicion');
+    }
+
+    public function ubicaciones(): HasMany
+    {
+        return $this->hasMany(UbicacionVehiculo::class, 'id_nivel');
     }
 }

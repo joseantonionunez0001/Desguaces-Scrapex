@@ -4,19 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Pasillo extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'pasillos';
-
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_pasillo';
 
     protected $fillable = [
-        'numero_pasillo'
+        'id_modulo',
+        'numero_pasillo',
     ];
 
-    // Sin relaciones por ahora. El EER relaciona Modulo con Pasillo, pero no
-    // muestra clave foránea. Se definirá cuando exista el modelo Modulo.
+    public function modulo(): BelongsTo
+    {
+        return $this->belongsTo(Modulo::class, 'id_modulo', 'id_modulo');
+    }
+
+    public function estanterias(): HasMany
+    {
+        return $this->hasMany(Estanteria::class, 'id_pasillo');
+    }
 }
