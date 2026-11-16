@@ -4,19 +4,32 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Movimiento extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'movimientos';
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_movimiento';
 
     protected $fillable = [
         'tipo_movimiento',
         'fecha',
-        'cantidad'
+        'cantidad',
+        'id_categoria',
     ];
 
-    // Sin relaciones por ahora. Movimiento (N:1) Categoria aún no tiene clave foránea en el esquema.
+    protected function casts(): array
+    {
+        return [
+            'fecha' => 'date',
+        ];
+    }
+
+    public function categoria(): BelongsTo
+    {
+        return $this->belongsTo(Categoria::class, 'id_categoria', 'categoria_id');
+    }
 }
