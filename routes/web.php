@@ -25,3 +25,14 @@ Route::middleware('auth')->group(function () {
     // El logout solo acepta POST (protegido por CSRF).
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });
+
+/*
+ * Rutas por módulo.
+ *
+ * Cada pantalla vive en su propio archivo dentro de routes/web/ (por ejemplo routes/web/vehiculos.php).
+ * Se cargan todos automáticamente, de modo que añadir un módulo nuevo no obliga a editar este archivo
+ * y las ramas de desarrollo no entran en conflicto entre sí.
+ */
+foreach (glob(__DIR__.'/web/*.php') ?: [] as $archivoDeRutas) {
+    require $archivoDeRutas;
+}
