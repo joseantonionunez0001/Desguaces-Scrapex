@@ -7,3 +7,70 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+@layer base {
+    body {
+        @apply bg-slate-100 text-slate-800 antialiased;
+    }
+}
+
+/*
+ * Clases de componentes compartidas por todas las pantallas del sistema.
+ * Los componentes Blade (resources/views/components) las reutilizan.
+ */
+@layer components {
+    .erp-label {
+        @apply mb-1 block text-sm font-medium text-slate-700;
+    }
+
+    .erp-input {
+        @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500;
+    }
+
+    .erp-input-error {
+        @apply border-red-500 focus:border-red-500 focus:ring-red-500/30;
+    }
+
+    .erp-table {
+        @apply min-w-full divide-y divide-slate-200 text-sm;
+    }
+
+    .erp-table thead th {
+        @apply whitespace-nowrap bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500;
+    }
+
+    .erp-table tbody {
+        @apply divide-y divide-slate-100;
+    }
+
+    .erp-table tbody td {
+        @apply px-4 py-3 align-middle text-slate-700;
+    }
+
+    .erp-table tbody tr:hover {
+        @apply bg-slate-50/70;
+    }
+
+    dialog.erp-modal::backdrop {
+        @apply bg-slate-900/50;
+    }
+}
+
+/* Indicador de carga en botones de envío (lo activa resources/js/app.js). */
+button[data-submitting]::before {
+    content: '';
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.5rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    animation: erp-spin 0.7s linear infinite;
+}
+
+@keyframes erp-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+.1
