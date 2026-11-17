@@ -20,7 +20,7 @@ class UsuarioAdministradorSeederTest extends TestCase
 
         $this->seed(UsuarioAdministradorSeeder::class);
 
-        $usuario = User::where('email', 'javi.ruiz@davante.org')->firstOrFail();
+        $usuario = User::where('email', 'javi.ruiz@davante.es')->firstOrFail();
         $this->assertTrue($usuario->hasRole(RoleSeeder::ADMINISTRADOR));
         $this->assertTrue(Hash::check('contrasena-de-prueba', $usuario->password));
     }
@@ -32,7 +32,7 @@ class UsuarioAdministradorSeederTest extends TestCase
 
         $this->seed(UsuarioAdministradorSeeder::class);
 
-        $this->assertFalse(User::where('email', 'javi.ruiz@davante.org')->exists());
+        $this->assertFalse(User::where('email', 'javi.ruiz@davante.es')->exists());
     }
 
     public function test_ejecutarlo_dos_veces_no_duplica_el_usuario(): void
@@ -43,6 +43,6 @@ class UsuarioAdministradorSeederTest extends TestCase
         $this->seed(UsuarioAdministradorSeeder::class);
         $this->seed(UsuarioAdministradorSeeder::class);
 
-        $this->assertSame(1, User::where('email', 'javi.ruiz@davante.org')->count());
+        $this->assertSame(1, User::where('email', 'javi.ruiz@davante.es')->count());
     }
 }
