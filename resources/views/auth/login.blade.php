@@ -1,25 +1,35 @@
-@extends('layouts.app')
+@extends('layouts.guest')
 
 @section('title', 'Login')
 
 @section('content')
-    <h2>Iniciar sesión</h2>
+    <div class="flex flex-1 items-center justify-center px-4 py-12">
+        <div class="w-full max-w-md">
+            <x-ui.card>
+                <h1 class="text-2xl font-bold text-blue-950">Iniciar sesión</h1>
+                <p class="mt-1 text-sm text-slate-500">Accede con tu correo y tu contraseña.</p>
 
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
+                <x-ui.flash />
 
-        <label for="email">Correo electrónico</label>
-        <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus>
-        @error('email')<div class="error">{{ $message }}</div>@enderror
+                <form method="POST" action="{{ route('login') }}" class="mt-6 space-y-4" novalidate>
+                    @csrf
 
-        <label for="password">Contraseña</label>
-        <input id="password" type="password" name="password" required>
-        @error('password')<div class="error">{{ $message }}</div>@enderror
+                    <x-form.input name="email" type="email" label="Correo electrónico" required autofocus autocomplete="username" />
+                    <x-form.input name="password" type="password" label="Contraseña" required autocomplete="current-password" />
 
-        <label>
-            <input type="checkbox" name="remember" style="width:auto"> Recordarme
-        </label>
+                    <label class="flex items-center gap-2 text-sm text-slate-600">
+                        <input type="checkbox" name="remember" value="1" class="size-4 rounded border-slate-300 text-blue-900 focus:ring-blue-600">
+                        Recordarme en este equipo
+                    </label>
 
-        <button type="submit">Entrar</button>
-    </form>
+                    <x-ui.button type="submit" class="w-full" icon="lock">Entrar</x-ui.button>
+                </form>
+            </x-ui.card>
+
+            <p class="mt-4 text-center text-sm text-slate-600">
+                ¿No tienes cuenta?
+                <a href="{{ route('register') }}" class="font-semibold text-blue-700 hover:underline">Regístrate</a>
+            </p>
+        </div>
+    </div>
 @endsection
