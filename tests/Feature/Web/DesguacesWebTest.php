@@ -202,7 +202,7 @@ class DesguacesWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->post(route('desguaces.store'), $this->datosValidos())
             ->assertRedirect(route('desguaces.index'))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertDatabaseHas('desguaces', [
             'nombre' => 'Desguace Central',
@@ -219,7 +219,7 @@ class DesguacesWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->put(route('desguaces.update', $desguace), ['nombre' => 'Renombrado'] + $this->datosValidos())
             ->assertRedirect(route('desguaces.index'))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertSame('Renombrado', $desguace->fresh()->nombre);
         $this->assertSame('Polígono Industrial', $desguace->fresh()->{'ubicación'});
@@ -255,7 +255,7 @@ class DesguacesWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('desguaces.destroy', $desguace))
             ->assertRedirect(route('desguaces.index'))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertSoftDeleted($desguace);
     }
@@ -273,7 +273,7 @@ class DesguacesWebTest extends TestCase
             $this->actingAs($administrador)
                 ->delete(route('desguaces.destroy', $desguace))
                 ->assertRedirect(route('desguaces.index'))
-                ->assertSessionHas('flasher::envelopes');
+                ->assertSessionHas('error');
 
             $this->assertNotSoftDeleted($desguace);
         }

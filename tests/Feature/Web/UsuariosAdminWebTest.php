@@ -164,7 +164,7 @@ class UsuariosAdminWebTest extends TestCase
         $this->actingAs($admin)
             ->put(route('admin.usuarios.rol.update', $objetivo), ['rol' => RoleSeeder::OPERARIO])
             ->assertRedirect(route('admin.usuarios.show', $objetivo))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertTrue($objetivo->fresh()->hasRole(RoleSeeder::OPERARIO));
         $this->assertTrue($objetivo->fresh()->can('movimientos.crear'));
@@ -207,7 +207,7 @@ class UsuariosAdminWebTest extends TestCase
         $this->actingAs($admin)
             ->delete(route('admin.usuarios.rol.destroy', $objetivo))
             ->assertRedirect(route('admin.usuarios.show', $objetivo))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertCount(0, $objetivo->fresh()->getRoleNames());
         $this->assertFalse($objetivo->fresh()->can('vehiculos.ver'));
@@ -221,7 +221,7 @@ class UsuariosAdminWebTest extends TestCase
         $this->actingAs($admin)
             ->delete(route('admin.usuarios.rol.destroy', $objetivo))
             ->assertRedirect()
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('warning');
     }
 
     public function test_un_administrador_no_puede_modificar_sus_propios_privilegios(): void
@@ -263,12 +263,12 @@ class UsuariosAdminWebTest extends TestCase
         $this->actingAs($actor)
             ->put(route('admin.usuarios.rol.update', $unicoAdmin), ['rol' => RoleSeeder::GERENTE])
             ->assertRedirect()
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('error');
 
         $this->actingAs($actor)
             ->delete(route('admin.usuarios.rol.destroy', $unicoAdmin))
             ->assertRedirect()
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('error');
 
         $this->assertTrue($unicoAdmin->fresh()->hasRole(RoleSeeder::ADMINISTRADOR));
     }

@@ -220,7 +220,7 @@ class MovimientosWebTest extends TestCase
 
             $this->actingAs($usuario)->post(route('movimientos.store'), $this->datosValidos($categoria))
                 ->assertRedirect(route('movimientos.index'))
-                ->assertSessionHas('flasher::envelopes');
+                ->assertSessionHas('success');
         }
 
         $this->assertDatabaseCount('movimientos', 3);
@@ -304,7 +304,7 @@ class MovimientosWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('movimientos.destroy', $movimiento))
             ->assertRedirect(route('movimientos.index'))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertSoftDeleted($movimiento);
     }

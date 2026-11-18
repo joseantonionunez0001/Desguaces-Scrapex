@@ -313,7 +313,7 @@ class AlmacenExteriorTest extends TestCase
                 'ruta' => $ruta,
             ])
             ->assertRedirect($this->urlDePosicion($e))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertDatabaseHas('posiciones', ['id_posicion' => $e['posicion']->id_posicion, 'numero_posicion' => '77', 'capacidad_maxima' => 6]);
     }
@@ -352,7 +352,7 @@ class AlmacenExteriorTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
             ->assertRedirect($this->urlDeNiveles($e))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertSoftDeleted('niveles', ['id_nivel' => $nivel->id_nivel]);
     }
@@ -365,7 +365,7 @@ class AlmacenExteriorTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('error');
 
         $this->assertNotSoftDeleted('niveles', ['id_nivel' => $nivel->id_nivel]);
     }
@@ -378,7 +378,7 @@ class AlmacenExteriorTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertSoftDeleted('niveles', ['id_nivel' => $nivel->id_nivel]);
         $this->assertNotSoftDeleted('ubicaciones_vehiculo', ['id_ubicacion' => $historica->id_ubicacion]);
@@ -390,7 +390,7 @@ class AlmacenExteriorTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('almacen.exterior.patios.destroy', $e['patio']->id_patio))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('error');
 
         $this->assertNotSoftDeleted('patios', ['id_patio' => $e['patio']->id_patio]);
     }

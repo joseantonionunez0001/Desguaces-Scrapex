@@ -24,7 +24,6 @@
             <x-layout.topbar />
 
             <main id="contenido" class="flex-1 p-4 sm:p-6 lg:p-8">
-                <x-ui.flash />
                 @yield('content')
             </main>
 
@@ -35,6 +34,15 @@
     </div>
 
     @stack('scripts')
+
+    {{-- Mensajes de sesión (success, error, warning, info) como avisos flotantes con la API JS de flasher. Ver config/flasher.php. --}}
+    @foreach (['success', 'error', 'warning', 'info'] as $tipo)
+        @if (session()->has($tipo))
+            <script>
+                window.addEventListener('load', () => window.flasher?.{{ $tipo }}(@json(session($tipo))));
+            </script>
+        @endif
+    @endforeach
     @flasher_render
 </body>
 </html>

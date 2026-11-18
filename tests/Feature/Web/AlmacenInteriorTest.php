@@ -157,7 +157,7 @@ class AlmacenInteriorTest extends TestCase
                 'ruta' => ['desguace' => $desguace->id_desguace],
             ])
             ->assertRedirect($this->urlIndice(['desguace' => $desguace->id_desguace]))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertDatabaseHas('modulos', ['id_desguace' => $desguace->id_desguace, 'nombre_modulo' => 'Módulo Nuevo']);
     }
@@ -323,7 +323,7 @@ class AlmacenInteriorTest extends TestCase
                 'ruta' => ['desguace' => $desguace->id_desguace, 'modulo' => $modulo->id_modulo],
             ])
             ->assertRedirect($this->urlIndice(['desguace' => $desguace->id_desguace, 'modulo' => $modulo->id_modulo]))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertDatabaseHas('pasillos', ['id_pasillo' => $pasillo->id_pasillo, 'numero_pasillo' => '99']);
     }
@@ -356,7 +356,7 @@ class AlmacenInteriorTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('almacen.interior.modulos.destroy', $modulo->id_modulo))
             ->assertRedirect($this->urlIndice(['desguace' => $desguace->id_desguace]))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
         $this->assertSoftDeleted('modulos', ['id_modulo' => $modulo->id_modulo]);
     }
 
@@ -370,7 +370,7 @@ class AlmacenInteriorTest extends TestCase
         $this->actingAs($administrador)
             ->delete(route('almacen.interior.modulos.destroy', $modulo->id_modulo))
             ->assertRedirect($this->urlIndice(['desguace' => $desguace->id_desguace]))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('error');
         $this->assertNotSoftDeleted('modulos', ['id_modulo' => $modulo->id_modulo]);
     }
 
@@ -382,7 +382,7 @@ class AlmacenInteriorTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('almacen.interior.modulos.destroy', $modulo->id_modulo))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('error');
         $this->assertNotSoftDeleted('modulos', ['id_modulo' => $modulo->id_modulo]);
     }
 

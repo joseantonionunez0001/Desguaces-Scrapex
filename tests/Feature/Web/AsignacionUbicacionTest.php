@@ -220,7 +220,7 @@ class AsignacionUbicacionTest extends TestCase
 
         $this->enviar('gerente', ['id_nivel' => $nivel->id_nivel, 'fecha_inicio' => '2026-05-01'])
             ->assertRedirect($destino)
-            ->assertSessionHas('flasher::envelopes')
+            ->assertSessionHas('success')
             ->assertSessionHasNoErrors();
 
         $ubicacion = UbicacionVehiculo::where('id_vehiculo', $this->vehiculo->id_vehiculo)->sole();
@@ -245,7 +245,7 @@ class AsignacionUbicacionTest extends TestCase
 
         $this->enviar('gerente', ['id_nivel' => $destino->id_nivel, 'fecha_inicio' => '2026-03-10'])
             ->assertSessionHasNoErrors()
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         // La fila anterior sigue existiendo (sin borrado lógico) y queda cerrada el día anterior.
         $anterior->refresh();

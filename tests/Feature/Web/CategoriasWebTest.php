@@ -170,19 +170,21 @@ class CategoriasWebTest extends TestCase
             $this->actingAs($this->usuarioConRol($rol))
                 ->post(route('categorias.store'), $this->datosValidos())
                 ->assertRedirect(route('categorias.index'))
-                ->assertSessionHas('flasher::envelopes');
+                ->assertSessionHas('success');
         }
 
         $this->assertDatabaseCount('categorias', 2);
         $this->assertDatabaseHas('categorias', ['nombre' => 'Transmisión', 'id_vehiculo' => null]);
     }
 
-    public function test_crear_una_categoria_deja_el_aviso_flotante_para_la_pagina_siguiente(): void
+    public function test_crear_una_categoria_muestra_el_aviso_flotante_en_la_pagina_siguiente(): void
     {
         $this->actingAs($this->usuarioConRol('gerente'))
+            ->followingRedirects()
             ->post(route('categorias.store'), $this->datosValidos())
-            ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('flasher::envelopes', fn ($sobres) => str_contains(implode('', $sobres), 'Categoría creada correctamente.'));
+            ->assertOk()
+            ->assertSee('window.flasher?.success', false)
+            ->assertSee('correctamente', false);
     }
 
     public function test_se_puede_asociar_un_vehiculo_y_quitarlo_al_editar(): void
@@ -214,7 +216,7 @@ class CategoriasWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('gerente'))
             ->put(route('categorias.update', $categoria), $datos)
             ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertDatabaseHas('categorias', ['categoria_id' => $categoria->categoria_id, 'nombre' => 'Renombrada']);
     }
@@ -288,7 +290,7 @@ class CategoriasWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('categorias.destroy', $categoria))
             ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('flasher::envelopes');
+            ->assertSessionHas('success');
 
         $this->assertSoftDeleted($categoria);
     }
@@ -305,7 +307,7 @@ class CategoriasWebTest extends TestCase
             $this->actingAs($administrador)
                 ->delete(route('categorias.destroy', $categoria))
                 ->assertRedirect(route('categorias.index'))
-                ->assertSessionHas('flasher::envelopes');
+                ->assertSessionHas('error');
 
             $this->assertNotSoftDeleted($categoria);
         }

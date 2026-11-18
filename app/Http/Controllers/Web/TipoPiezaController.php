@@ -19,9 +19,9 @@ class TipoPiezaController extends Controller
         $tipoPieza->fill($request->validated());
         $tipoPieza->save();
 
-        flash()->success('Tipo de pieza creado correctamente.');
-
-        return redirect()->route('categorias.index');
+        return redirect()
+            ->route('categorias.index')
+            ->with('success', 'Tipo de pieza creado correctamente.');
     }
 
     public function update(TipoPiezaRequest $request, TipoPieza $tipoPieza): RedirectResponse
@@ -29,9 +29,9 @@ class TipoPiezaController extends Controller
         $tipoPieza->fill($request->validated());
         $tipoPieza->save();
 
-        flash()->success('Tipo de pieza actualizado correctamente.');
-
-        return redirect()->route('categorias.index');
+        return redirect()
+            ->route('categorias.index')
+            ->with('success', 'Tipo de pieza actualizado correctamente.');
     }
 
     /**
@@ -40,15 +40,15 @@ class TipoPiezaController extends Controller
     public function destroy(TipoPieza $tipoPieza): RedirectResponse
     {
         if ($tipoPieza->piezas()->exists()) {
-            flash()->error("No se puede eliminar el tipo de pieza «{$tipoPieza->nombre}» porque tiene piezas asociadas.");
-
-            return redirect()->route('categorias.index');
+            return redirect()
+                ->route('categorias.index')
+                ->with('error', "No se puede eliminar el tipo de pieza «{$tipoPieza->nombre}» porque tiene piezas asociadas.");
         }
 
         $tipoPieza->delete();
 
-        flash()->success('Tipo de pieza eliminado correctamente.');
-
-        return redirect()->route('categorias.index');
+        return redirect()
+            ->route('categorias.index')
+            ->with('success', 'Tipo de pieza eliminado correctamente.');
     }
 }

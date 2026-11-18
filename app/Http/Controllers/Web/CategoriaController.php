@@ -78,9 +78,9 @@ class CategoriaController extends Controller
         $categoria->fill($request->validated() + ['id_vehiculo' => null]);
         $categoria->save();
 
-        flash()->success('Categoría creada correctamente.');
-
-        return redirect()->route('categorias.index');
+        return redirect()
+            ->route('categorias.index')
+            ->with('success', 'Categoría creada correctamente.');
     }
 
     public function update(CategoriaRequest $request, Categoria $categoria): RedirectResponse
@@ -88,9 +88,9 @@ class CategoriaController extends Controller
         $categoria->fill($request->validated() + ['id_vehiculo' => null]);
         $categoria->save();
 
-        flash()->success('Categoría actualizada correctamente.');
-
-        return redirect()->route('categorias.index');
+        return redirect()
+            ->route('categorias.index')
+            ->with('success', 'Categoría actualizada correctamente.');
     }
 
     /**
@@ -100,16 +100,16 @@ class CategoriaController extends Controller
     public function destroy(Categoria $categoria): RedirectResponse
     {
         if ($categoria->tiposPieza()->exists() || $categoria->movimientos()->exists()) {
-            flash()->error("No se puede eliminar la categoría «{$categoria->nombre}» porque tiene tipos de pieza o movimientos asociados.");
-
-            return redirect()->route('categorias.index');
+            return redirect()
+                ->route('categorias.index')
+                ->with('error', "No se puede eliminar la categoría «{$categoria->nombre}» porque tiene tipos de pieza o movimientos asociados.");
         }
 
         $categoria->delete();
 
-        flash()->success('Categoría eliminada correctamente.');
-
-        return redirect()->route('categorias.index');
+        return redirect()
+            ->route('categorias.index')
+            ->with('success', 'Categoría eliminada correctamente.');
     }
 
     /**
