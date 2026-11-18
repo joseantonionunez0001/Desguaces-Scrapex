@@ -384,7 +384,7 @@ class VehiculosWebTest extends TestCase
 
         $vehiculo = Vehiculo::where('matricula', '1234BCD')->firstOrFail();
         $respuesta->assertRedirect(route('vehiculos.show', $vehiculo))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
         $this->assertDatabaseHas('vehiculos', [
             'id_desguace' => $desguace->id_desguace,
             'marca' => 'SEAT',
@@ -466,7 +466,7 @@ class VehiculosWebTest extends TestCase
                 ['modelo' => 'Leon', 'estado_tratamiento' => 'Descontaminado'],
             ))
             ->assertRedirect(route('vehiculos.show', $vehiculo))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertDatabaseHas('vehiculos', [
             'id_vehiculo' => $vehiculo->id_vehiculo,
@@ -510,7 +510,7 @@ class VehiculosWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('vehiculos.destroy', $vehiculo))
             ->assertRedirect(route('vehiculos.index'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertSoftDeleted('vehiculos', ['id_vehiculo' => $vehiculo->id_vehiculo]);
     }

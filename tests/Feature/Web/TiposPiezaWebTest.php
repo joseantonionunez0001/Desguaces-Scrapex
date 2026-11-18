@@ -202,7 +202,7 @@ class TiposPiezaWebTest extends TestCase
             $this->actingAs($this->usuarioConRol($rol))
                 ->post(route('tipos-pieza.store'), $this->datosValidos($categoria))
                 ->assertRedirect(route('categorias.index'))
-                ->assertSessionHas('success');
+                ->assertSessionHas('flasher::envelopes');
         }
 
         $this->assertDatabaseCount('tipo_piezas', 2);
@@ -224,7 +224,7 @@ class TiposPiezaWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('gerente'))
             ->put(route('tipos-pieza.update', $tipo), $this->datosValidos($categoria))
             ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertDatabaseHas('tipo_piezas', [
             'id_pieza' => $tipo->id_pieza,
@@ -255,7 +255,7 @@ class TiposPiezaWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('tipos-pieza.destroy', $tipo))
             ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertSoftDeleted($tipo);
     }
@@ -268,7 +268,7 @@ class TiposPiezaWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('tipos-pieza.destroy', $tipo))
             ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('error');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertNotSoftDeleted($tipo);
     }

@@ -327,7 +327,7 @@ class PiezasWebTest extends TestCase
             ->post(route('piezas.store'), $this->datosPieza($tipo, ['id_usuario' => $otroUsuario->id]));
 
         $pieza = Pieza::where('nombre', 'Alternador Bosch')->firstOrFail();
-        $respuesta->assertRedirect(route('piezas.show', $pieza))->assertSessionHas('success');
+        $respuesta->assertRedirect(route('piezas.show', $pieza))->assertSessionHas('flasher::envelopes');
         $this->assertDatabaseHas('piezas', [
             'id_pieza' => $pieza->id_pieza,
             'estado' => 'Usada',
@@ -407,7 +407,7 @@ class PiezasWebTest extends TestCase
                 ['nombre' => 'Nombre nuevo', 'stock' => 0, 'id_usuario' => $gerente->id],
             ))
             ->assertRedirect(route('piezas.show', $pieza))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertDatabaseHas('piezas', [
             'id_pieza' => $pieza->id_pieza,
@@ -448,7 +448,7 @@ class PiezasWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('piezas.destroy', $pieza))
             ->assertRedirect(route('piezas.index'))
-            ->assertSessionHas('success');
+            ->assertSessionHas('flasher::envelopes');
 
         $this->assertSoftDeleted('piezas', ['id_pieza' => $pieza->id_pieza]);
     }

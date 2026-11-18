@@ -35,5 +35,6 @@
     </div>
 
     @stack('scripts')
+    @flasher_render
 </body>
 </html>
