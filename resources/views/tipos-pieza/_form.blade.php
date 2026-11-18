@@ -15,6 +15,8 @@
         'marca' => $marcaPreseleccionada ?? null,
         'modelo' => $modeloPreseleccionado ?? null,
         'categoria_texto' => $categoriaTextoPreseleccionado ?? null,
+        // En las secciones de marca y modelo, el fabricante es la propia marca.
+        'fabricante' => $marcaPreseleccionada ?? null,
     ], fn ($valor) => $valor !== null);
     $marcaFija = $fijos['marca'] ?? null;
     $modeloFijo = $fijos['modelo'] ?? null;
@@ -40,7 +42,11 @@
             </div>
         @endif
 
-        <x-form.input name="fabricante" label="Fabricante" :required="true" maxlength="255" :value="$tipoPieza?->fabricante" :use-old="$usarOld" />
+        @if (isset($fijos['fabricante']))
+            <input type="hidden" name="fabricante" value="{{ $fijos['fabricante'] }}">
+        @else
+            <x-form.input name="fabricante" label="Fabricante" :required="true" maxlength="255" :value="$tipoPieza?->fabricante" :use-old="$usarOld" />
+        @endif
 
         @if (isset($fijos['categoria_texto']))
             <input type="hidden" name="categoria" value="{{ $fijos['categoria_texto'] }}">
