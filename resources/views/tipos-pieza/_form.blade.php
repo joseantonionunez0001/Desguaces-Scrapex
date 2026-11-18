@@ -14,6 +14,7 @@
         'id_categoria' => $categoriaPreseleccionada ?? null,
         'marca' => $marcaPreseleccionada ?? null,
         'modelo' => $modeloPreseleccionado ?? null,
+        'categoria_texto' => $categoriaTextoPreseleccionado ?? null,
     ], fn ($valor) => $valor !== null);
     $marcaFija = $fijos['marca'] ?? null;
     $modeloFijo = $fijos['modelo'] ?? null;
@@ -41,9 +42,12 @@
 
         <x-form.input name="fabricante" label="Fabricante" :required="true" maxlength="255" :value="$tipoPieza?->fabricante" :use-old="$usarOld" />
 
+        @if (isset($fijos['categoria_texto']))
+            <input type="hidden" name="categoria" value="{{ $fijos['categoria_texto'] }}">
+        @else
         <div>
             <x-form.input name="categoria" label="Categoría (texto)" :required="true" maxlength="255"
-                :value="$tipoPieza?->categoria ?? ($fijos['categoria_texto'] ?? null)" :use-old="$usarOld"
+                :value="$tipoPieza?->categoria" :use-old="$usarOld"
                 list="{{ $listaId }}" autocomplete="off" hint="Texto de clasificación del tipo de pieza (por ejemplo: Motor)." />
             <datalist id="{{ $listaId }}">
                 @foreach ($categoriasTexto as $textoCategoria)
@@ -51,6 +55,7 @@
                 @endforeach
             </datalist>
         </div>
+        @endif
 
         @if (isset($fijos['id_categoria']))
             <input type="hidden" name="id_categoria" value="{{ $fijos['id_categoria'] }}">

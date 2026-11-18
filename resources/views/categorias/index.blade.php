@@ -95,7 +95,7 @@
                                                             'tipoPieza' => null,
                                                             'categorias' => $opcionesCategorias,
                                                             'categoriasTexto' => $categoriasTexto,
-                                                            'categoriaPreseleccionada' => $categoria->categoria_id,
+                                                            'categoriaPreseleccionada' => $categoria->categoria_id, 'categoriaTextoPreseleccionado' => $categoria->nombre,
                                                             'marcaPreseleccionada' => $marca === 'Sin marca' ? null : $marca,
                                                             'modeloPreseleccionado' => null,
                                                         ])
@@ -124,7 +124,7 @@
                                                                     'tipoPieza' => null,
                                                                     'categorias' => $opcionesCategorias,
                                                                     'categoriasTexto' => $categoriasTexto,
-                                                                    'categoriaPreseleccionada' => $categoria->categoria_id,
+                                                                    'categoriaPreseleccionada' => $categoria->categoria_id, 'categoriaTextoPreseleccionado' => $categoria->nombre,
                                                                     'marcaPreseleccionada' => $marca === 'Sin marca' ? null : $marca,
                                                                     'modeloPreseleccionado' => $modelo === 'Sin modelo' ? null : $modelo,
                                                                 ])
@@ -220,7 +220,7 @@
                     'tipoPieza' => null,
                     'categorias' => $opcionesCategorias,
                     'categoriasTexto' => $categoriasTexto,
-                    'categoriaPreseleccionada' => $categoria->categoria_id,
+                    'categoriaPreseleccionada' => $categoria->categoria_id, 'categoriaTextoPreseleccionado' => $categoria->nombre,
                 ])
             </x-ui.modal>
         @endforeach
