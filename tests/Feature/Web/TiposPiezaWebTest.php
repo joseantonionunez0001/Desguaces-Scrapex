@@ -174,8 +174,8 @@ class TiposPiezaWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
             ->assertSee($botonMarca, false)
             ->assertSee($botonModelo, false)
-            ->assertSee('value="Seat"', false)
-            ->assertSee('value="Ibiza"', false);
+            ->assertSee('<input type="hidden" name="marca" value="Seat">', false)
+            ->assertSee('<input type="hidden" name="modelo" value="Ibiza">', false);
     }
 
     public function test_el_operario_no_puede_crear_editar_ni_eliminar(): void
