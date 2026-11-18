@@ -27,6 +27,7 @@ class CategoriaController extends Controller
                 'desguace' => fn ($relacion) => $relacion->withTrashed(),
                 'modulo' => fn ($relacion) => $relacion->withTrashed(),
                 'vehiculo' => fn ($relacion) => $relacion->withTrashed(),
+                'tiposPieza' => fn ($relacion) => $relacion->orderBy('nombre'),
             ])
             ->withCount(['tiposPieza', 'movimientos'])
             ->when($busqueda !== '', fn ($consulta) => $consulta->where(function ($grupo) use ($busqueda): void {

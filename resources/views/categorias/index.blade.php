@@ -49,7 +49,23 @@
                 </x-slot:head>
                 @foreach ($categorias as $categoria)
                     <tr>
-                        <td class="font-medium text-slate-900">{{ $categoria->nombre }}</td>
+                        <td class="font-medium text-slate-900">
+                            {{ $categoria->nombre }}
+                            @can('tipo_piezas.ver')
+                                <ul class="mt-1 space-y-0.5 pl-3 text-sm font-normal text-slate-600" aria-label="Tipos de pieza de {{ $categoria->nombre }}">
+                                    @forelse ($categoria->tiposPieza as $tipoPieza)
+                                        <li>
+                                            {{ $tipoPieza->nombre }}
+                                            @if ($tipoPieza->fabricante)
+                                                <span class="text-slate-500">({{ $tipoPieza->fabricante }})</span>
+                                            @endif
+                                        </li>
+                                    @empty
+                                        <li class="text-slate-500">Sin tipos de pieza</li>
+                                    @endforelse
+                                </ul>
+                            @endcan
+                        </td>
                         <td>{{ $categoria->desguace?->nombre ?? '—' }}</td>
                         <td>{{ $categoria->modulo?->nombre_modulo ?? '—' }}</td>
                         <td>{{ $categoria->vehiculo?->matricula ?? '—' }}</td>
