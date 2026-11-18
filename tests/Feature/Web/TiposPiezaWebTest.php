@@ -97,7 +97,8 @@ class TiposPiezaWebTest extends TestCase
                 ->assertOk()
                 ->assertSee('Electricidad')
                 ->assertSee('Alternador 90A')
-                ->assertSee('Seat Ibiza')
+                ->assertSee('aria-label="Marca Seat"', false)
+                ->assertSee('Tipos de pieza de Seat Ibiza', false)
                 ->assertSee('Bosch')
                 ->assertSee('2 piezas')
                 ->assertViewHas('categorias', fn ($categorias) => $categorias->first()->tiposPieza->first()->piezas_count === 2);

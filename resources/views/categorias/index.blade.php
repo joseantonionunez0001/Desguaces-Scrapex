@@ -15,7 +15,7 @@
     </x-ui.page-header>
 
     <x-ui.filters columns="sm:grid-cols-2">
-        <x-form.input name="q" label="Buscar" :value="$filtros['q']" :use-old="false" placeholder="Categoría, tipo de pieza, fabricante, desguace o matrícula" />
+        <x-form.input name="q" label="Buscar" :value="$filtros['q']" :use-old="false" placeholder="Categoría, marca, modelo, tipo de pieza, fabricante o matrícula" />
         <x-form.select name="desguace" label="Desguace" :options="$desguaces" :value="$filtros['desguace']" placeholder="Todos" :use-old="false" />
     </x-ui.filters>
 
@@ -54,41 +54,63 @@
                             <div class="px-5 py-4">
                                 @can('tipo_piezas.ver')
                                     <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-                                        <h3 class="text-sm font-semibold text-slate-900">Tipos de pieza</h3>
+                                        <h3 class="text-sm font-semibold text-slate-900">Tipos de pieza por marca y modelo</h3>
                                         @can('tipo_piezas.crear')
                                             <x-ui.button variant="outline" size="sm" icon="plus" data-modal-open="crear-tipo-{{ $categoria->categoria_id }}"
                                                 aria-label="Añadir un tipo de pieza a {{ $categoria->nombre }}">Añadir tipo</x-ui.button>
                                         @endcan
                                     </div>
 
-                                    <ul class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Tipos de pieza de {{ $categoria->nombre }}">
-                                        @forelse ($categoria->tiposPieza as $tipoPieza)
-                                            <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
-                                                <span class="min-w-0">
-                                                    <span class="block truncate font-medium text-slate-900">{{ $tipoPieza->nombre }}</span>
-                                                    <span class="block truncate text-xs text-slate-500">{{ $tipoPieza->marca }} {{ $tipoPieza->modelo }} · {{ $tipoPieza->fabricante }}</span>
-                                                </span>
-                                                <span class="flex shrink-0 items-center gap-2">
-                                                    <span class="whitespace-nowrap text-xs tabular-nums text-slate-500">{{ $tipoPieza->piezas_count }} piezas</span>
-                                                    @can('tipo_piezas.editar')
-                                                        <x-ui.button variant="outline" size="sm" icon="pencil" data-modal-open="editar-tipo-pieza-{{ $tipoPieza->id_pieza }}"
-                                                            aria-label="Editar el tipo de pieza {{ $tipoPieza->nombre }}">Editar</x-ui.button>
-                                                    @endcan
-                                                    @can('tipo_piezas.eliminar')
-                                                        <x-ui.delete-button
-                                                            :action="route('tipos-pieza.destroy', $tipoPieza)"
-                                                            message="¿Seguro que quieres eliminar el tipo de pieza «{{ $tipoPieza->nombre }}»? Esta acción no se puede deshacer."
-                                                            label="Eliminar el tipo de pieza {{ $tipoPieza->nombre }}"
-                                                            :icon-only="true" />
-                                                    @endcan
-                                                </span>
-                                            </li>
-                                        @empty
-                                            <li class="col-span-full text-sm text-slate-500">
-                                                {{ $filtros['q'] !== '' ? 'Ningún tipo de esta categoría coincide con la búsqueda.' : 'Sin tipos de pieza.' }}
-                                            </li>
-                                        @endforelse
-                                    </ul>
+                                    @php
+                                        // Marca → modelo → tipos de pieza. Los tipos sin marca o modelo se agrupan aparte.
+                                        $tiposPorMarca = $categoria->tiposPieza
+                                            ->groupBy(fn ($tipo) => $tipo->marca ?: 'Sin marca')
+                                            ->sortKeys()
+                                            ->map(fn ($tiposDeMarca) => $tiposDeMarca
+                                                ->groupBy(fn ($tipo) => $tipo->modelo ?: 'Sin modelo')
+                                                ->sortKeys());
+                                    @endphp
+
+                                    @forelse ($tiposPorMarca as $marca => $modelos)
+                                        <section class="mb-4 last:mb-0" aria-label="Marca {{ $marca }}">
+                                            <h4 class="text-sm font-semibold text-blue-950">{{ $marca }}</h4>
+                                            <div class="mt-2 space-y-3 border-l-2 border-blue-100 pl-4">
+                                                @foreach ($modelos as $modelo => $tiposDelModelo)
+                                                    <div>
+                                                        <h5 class="text-sm font-medium text-slate-700">{{ $modelo }}</h5>
+                                                        <ul class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Tipos de pieza de {{ $marca }} {{ $modelo }}">
+                                                            @foreach ($tiposDelModelo as $tipoPieza)
+                                                                <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+                                                                    <span class="min-w-0">
+                                                                        <span class="block truncate font-medium text-slate-900">{{ $tipoPieza->nombre }}</span>
+                                                                        <span class="block truncate text-xs text-slate-500">{{ $tipoPieza->fabricante }}</span>
+                                                                    </span>
+                                                                    <span class="flex shrink-0 items-center gap-2">
+                                                                        <span class="whitespace-nowrap text-xs tabular-nums text-slate-500">{{ $tipoPieza->piezas_count }} piezas</span>
+                                                                        @can('tipo_piezas.editar')
+                                                                            <x-ui.button variant="outline" size="sm" icon="pencil" data-modal-open="editar-tipo-pieza-{{ $tipoPieza->id_pieza }}"
+                                                                                aria-label="Editar el tipo de pieza {{ $tipoPieza->nombre }}">Editar</x-ui.button>
+                                                                        @endcan
+                                                                        @can('tipo_piezas.eliminar')
+                                                                            <x-ui.delete-button
+                                                                                :action="route('tipos-pieza.destroy', $tipoPieza)"
+                                                                                message="¿Seguro que quieres eliminar el tipo de pieza «{{ $tipoPieza->nombre }}»? Esta acción no se puede deshacer."
+                                                                                label="Eliminar el tipo de pieza {{ $tipoPieza->nombre }}"
+                                                                                :icon-only="true" />
+                                                                        @endcan
+                                                                    </span>
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </section>
+                                    @empty
+                                        <p class="text-sm text-slate-500">
+                                            {{ $filtros['q'] !== '' ? 'Ningún tipo de esta categoría coincide con la búsqueda.' : 'Sin tipos de pieza.' }}
+                                        </p>
+                                    @endforelse
                                 @endcan
 
                                 @canany(['categorias.editar', 'categorias.eliminar'])
