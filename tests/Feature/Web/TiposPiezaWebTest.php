@@ -160,6 +160,24 @@ class TiposPiezaWebTest extends TestCase
             ->assertSee($botonDeAlta, false)->assertSee($botonDeEdicion, false)->assertSee($formularioDeBorrado, false);
     }
 
+    public function test_los_botones_de_anadir_por_marca_y_modelo_dependen_del_permiso_de_alta(): void
+    {
+        $categoria = $this->categoriaCoherente();
+        TipoPieza::factory()->create(['marca' => 'Seat', 'modelo' => 'Ibiza', 'id_categoria' => $categoria->categoria_id]);
+        $botonMarca = 'data-modal-open="crear-tipo-'.$categoria->categoria_id.'-'.md5('Seat').'"';
+        $botonModelo = 'data-modal-open="crear-tipo-'.$categoria->categoria_id.'-'.md5('Seat|Ibiza').'"';
+
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))
+            ->assertDontSee($botonMarca, false)
+            ->assertDontSee($botonModelo, false);
+
+        $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
+            ->assertSee($botonMarca, false)
+            ->assertSee($botonModelo, false)
+            ->assertSee('value="Seat"', false)
+            ->assertSee('value="Ibiza"', false);
+    }
+
     public function test_el_operario_no_puede_crear_editar_ni_eliminar(): void
     {
         $categoria = $this->categoriaCoherente();

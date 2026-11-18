@@ -82,6 +82,25 @@
                                             </summary>
 
                                             <div class="space-y-2 border-t border-slate-200 p-3">
+                                                @can('tipo_piezas.crear')
+                                                    <div class="flex justify-end">
+                                                        <x-ui.button variant="outline" size="sm" icon="plus" data-modal-open="crear-tipo-{{ $categoria->categoria_id }}-{{ md5($marca) }}"
+                                                            aria-label="Añadir un tipo de pieza de la marca {{ $marca }}">Añadir tipo</x-ui.button>
+                                                    </div>
+                                                    <x-ui.modal :id="'crear-tipo-'.$categoria->categoria_id.'-'.md5($marca)" title="Nuevo tipo de pieza"
+                                                        :open="old('_modal') === 'crear-tipo-'.$categoria->categoria_id.'-'.md5($marca)">
+                                                        @include('tipos-pieza._form', [
+                                                            'modalId' => 'crear-tipo-'.$categoria->categoria_id.'-'.md5($marca),
+                                                            'accion' => route('tipos-pieza.store'),
+                                                            'tipoPieza' => null,
+                                                            'categorias' => $opcionesCategorias,
+                                                            'categoriasTexto' => $categoriasTexto,
+                                                            'categoriaPreseleccionada' => $categoria->categoria_id,
+                                                            'marcaPreseleccionada' => $marca === 'Sin marca' ? null : $marca,
+                                                            'modeloPreseleccionado' => null,
+                                                        ])
+                                                    </x-ui.modal>
+                                                @endcan
                                                 @foreach ($modelos as $modelo => $tiposDelModelo)
                                                     <details class="group/modelo rounded-md border border-slate-100 bg-slate-50" @if ($filtros['q'] !== '') open @endif>
                                                         <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden">
@@ -92,6 +111,25 @@
                                                             </span>
                                                         </summary>
 
+                                                        @can('tipo_piezas.crear')
+                                                            <div class="flex justify-end px-3 pt-3">
+                                                                <x-ui.button variant="outline" size="sm" icon="plus" data-modal-open="crear-tipo-{{ $categoria->categoria_id }}-{{ md5($marca.'|'.$modelo) }}"
+                                                                    aria-label="Añadir un tipo de pieza de {{ $marca }} {{ $modelo }}">Añadir tipo</x-ui.button>
+                                                            </div>
+                                                            <x-ui.modal :id="'crear-tipo-'.$categoria->categoria_id.'-'.md5($marca.'|'.$modelo)" title="Nuevo tipo de pieza"
+                                                                :open="old('_modal') === 'crear-tipo-'.$categoria->categoria_id.'-'.md5($marca.'|'.$modelo)">
+                                                                @include('tipos-pieza._form', [
+                                                                    'modalId' => 'crear-tipo-'.$categoria->categoria_id.'-'.md5($marca.'|'.$modelo),
+                                                                    'accion' => route('tipos-pieza.store'),
+                                                                    'tipoPieza' => null,
+                                                                    'categorias' => $opcionesCategorias,
+                                                                    'categoriasTexto' => $categoriasTexto,
+                                                                    'categoriaPreseleccionada' => $categoria->categoria_id,
+                                                                    'marcaPreseleccionada' => $marca === 'Sin marca' ? null : $marca,
+                                                                    'modeloPreseleccionado' => $modelo === 'Sin modelo' ? null : $modelo,
+                                                                ])
+                                                            </x-ui.modal>
+                                                        @endcan
                                                         <ul class="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Tipos de pieza de {{ $marca }} {{ $modelo }}">
                                                             @foreach ($tiposDelModelo as $tipoPieza)
                                                                 <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
