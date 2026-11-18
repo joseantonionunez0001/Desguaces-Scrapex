@@ -5,7 +5,6 @@
 @section('content')
     <section class="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 text-white">
         <div class="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-16 sm:px-6 sm:py-24">
-            <x-ui.badge tone="blue" class="bg-white/10! text-blue-100! ring-white/20!">Trabajo de Fin de Grado</x-ui.badge>
             <h1 class="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">{{ config('navegacion.marca') }}</h1>
             <p class="max-w-2xl text-lg text-blue-100">
                 Sistema integral de gestión de desguaces: controla los vehículos que llegan, el catálogo de piezas,
