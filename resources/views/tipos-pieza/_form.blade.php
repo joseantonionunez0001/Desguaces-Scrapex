@@ -2,6 +2,7 @@
     Formulario de tipo de pieza para los modales de alta y edición.
     Variables: $modalId, $accion, $tipoPieza (null al crear), $categorias, $categoriasTexto.
     El EER guarda la categoría de dos formas: "categoria" (texto) e "id_categoria" (clave foránea).
+    $categoriaPreseleccionada es opcional: preselecciona la categoría al crear desde una categoría concreta.
 --}}
 @php
     $usarOld = old('_modal') === $modalId;
@@ -27,7 +28,7 @@
                 @endforeach
             </datalist>
         </div>
-        <x-form.select name="id_categoria" label="Categoría relacionada" :required="true" :options="$categorias" :value="$tipoPieza?->id_categoria"
+        <x-form.select name="id_categoria" label="Categoría relacionada" :required="true" :options="$categorias" :value="$tipoPieza?->id_categoria ?? ($categoriaPreseleccionada ?? null)"
             placeholder="Selecciona una categoría" :use-old="$usarOld" />
     </div>
 

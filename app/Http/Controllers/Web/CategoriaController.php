@@ -7,7 +7,9 @@ use App\Http\Requests\Web\CategoriaRequest;
 use App\Models\Categoria;
 use App\Models\Desguace;
 use App\Models\Modulo;
+use App\Models\TipoPieza;
 use App\Models\Vehiculo;
+use App\Support\OpcionesCategorias;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -27,14 +29,26 @@ class CategoriaController extends Controller
                 'desguace' => fn ($relacion) => $relacion->withTrashed(),
                 'modulo' => fn ($relacion) => $relacion->withTrashed(),
                 'vehiculo' => fn ($relacion) => $relacion->withTrashed(),
-                'tiposPieza' => fn ($relacion) => $relacion->withCount('piezas')->orderBy('nombre'),
+                'tiposPieza' => fn ($relacion) => $relacion
+                    ->withCount('piezas')
+                    ->when($busqueda !== '', fn ($tipos) => $tipos->where(function ($grupo) use ($busqueda): void {
+                        $grupo->where('nombre', 'like', "%{$busqueda}%")
+                            ->orWhere('fabricante', 'like', "%{$busqueda}%")
+                            ->orWhere('categoria', 'like', "%{$busqueda}%");
+                    }))
+                    ->orderBy('nombre'),
             ])
             ->withCount(['tiposPieza', 'movimientos'])
             ->when($busqueda !== '', fn ($consulta) => $consulta->where(function ($grupo) use ($busqueda): void {
                 $grupo->where('nombre', 'like', "%{$busqueda}%")
                     ->orWhereHas('desguace', fn ($relacion) => $relacion->where('nombre', 'like', "%{$busqueda}%"))
                     ->orWhereHas('modulo', fn ($relacion) => $relacion->where('nombre_modulo', 'like', "%{$busqueda}%"))
-                    ->orWhereHas('vehiculo', fn ($relacion) => $relacion->where('matricula', 'like', "%{$busqueda}%"));
+                    ->orWhereHas('vehiculo', fn ($relacion) => $relacion->where('matricula', 'like', "%{$busqueda}%"))
+                    ->orWhereHas('tiposPieza', fn ($relacion) => $relacion->where(function ($tipos) use ($busqueda): void {
+                        $tipos->where('nombre', 'like', "%{$busqueda}%")
+                            ->orWhere('fabricante', 'like', "%{$busqueda}%")
+                            ->orWhere('categoria', 'like', "%{$busqueda}%");
+                    }));
             }))
             ->when($desguaceId !== null, fn ($consulta) => $consulta->where('id_desguace', $desguaceId))
             ->orderBy('nombre')
@@ -47,6 +61,8 @@ class CategoriaController extends Controller
             'desguaces' => Desguace::query()->orderBy('nombre')->pluck('nombre', 'id_desguace')->all(),
             'modulos' => $this->opcionesDeModulos(),
             'vehiculos' => $this->opcionesDeVehiculos(),
+            'opcionesCategorias' => OpcionesCategorias::paraSelect(),
+            'categoriasTexto' => TipoPieza::query()->distinct()->orderBy('categoria')->pluck('categoria')->all(),
             'filtros' => ['q' => $busqueda, 'desguace' => $desguaceId],
             'hayFiltros' => $busqueda !== '' || $desguaceId !== null,
         ]);

@@ -8,6 +8,7 @@ use App\Models\Modulo;
 use App\Models\Pieza;
 use App\Models\TipoPieza;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
 
@@ -48,7 +49,6 @@ class TiposPiezaWebTest extends TestCase
 
     public function test_invitado_es_redirigido_al_login(): void
     {
-        $this->get(route('tipos-pieza.index'))->assertRedirect(route('login'));
         $this->post(route('tipos-pieza.store'), [])->assertRedirect(route('login'));
     }
 
@@ -58,7 +58,6 @@ class TiposPiezaWebTest extends TestCase
         $tipo = TipoPieza::factory()->create();
         $categoria = $this->categoriaCoherente();
 
-        $this->actingAs($usuario)->get(route('tipos-pieza.index'))->assertForbidden();
         $this->actingAs($usuario)->post(route('tipos-pieza.store'), $this->datosValidos($categoria))->assertForbidden();
         $this->actingAs($usuario)->put(route('tipos-pieza.update', $tipo), $this->datosValidos($categoria))->assertForbidden();
         $this->actingAs($usuario)->delete(route('tipos-pieza.destroy', $tipo))->assertForbidden();
@@ -72,7 +71,12 @@ class TiposPiezaWebTest extends TestCase
         $this->assertSame(['tipoPieza'], app('router')->getRoutes()->getByName('tipos-pieza.update')->parameterNames());
     }
 
-    public function test_todos_los_roles_ven_los_tipos_con_categoria_y_numero_de_piezas(): void
+    public function test_la_pagina_de_tipos_ya_no_existe(): void
+    {
+        $this->assertFalse(Route::has('tipos-pieza.index'));
+    }
+
+    public function test_todos_los_roles_ven_los_tipos_dentro_de_su_categoria_con_sus_piezas(): void
     {
         $categoria = $this->categoriaCoherente('Electricidad', 'Desguace Levante');
         $tipo = TipoPieza::factory()->create([
@@ -85,70 +89,69 @@ class TiposPiezaWebTest extends TestCase
 
         foreach (['operario', 'gerente', 'administrador'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
-                ->get(route('tipos-pieza.index'))
+                ->get(route('categorias.index'))
                 ->assertOk()
+                ->assertSee('Electricidad')
                 ->assertSee('Alternador 90A')
                 ->assertSee('Bosch')
-                ->assertSee('Texto libre')
-                ->assertSee('Electricidad')
-                ->assertSee('Desguace Levante')
-                ->assertViewHas('tiposPieza', fn ($tipos) => $tipos->first()->piezas_count === 2);
+                ->assertSee('2 piezas')
+                ->assertViewHas('categorias', fn ($categorias) => $categorias->first()->tiposPieza->first()->piezas_count === 2);
         }
     }
 
-    public function test_estado_vacio(): void
+    public function test_una_categoria_sin_tipos_lo_indica(): void
     {
+        $this->categoriaCoherente('Frenos');
+
         $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('tipos-pieza.index'))
+            ->get(route('categorias.index'))
             ->assertOk()
-            ->assertSee('Todavía no hay tipos de pieza');
+            ->assertSee('Sin tipos de pieza.');
     }
 
-    public function test_buscador_y_filtro_por_categoria(): void
+    public function test_el_buscador_encuentra_tipos_por_nombre_fabricante_y_texto_y_muestra_solo_los_que_coinciden(): void
     {
-        $motor = $this->categoriaCoherente('Motor');
         $frenos = $this->categoriaCoherente('Frenos');
+        $motor = $this->categoriaCoherente('Motor');
         TipoPieza::factory()->create(['nombre' => 'Pastillas', 'fabricante' => 'Ferodo', 'categoria' => 'Frenado', 'id_categoria' => $frenos->categoria_id]);
+        TipoPieza::factory()->create(['nombre' => 'Disco', 'fabricante' => 'Brembo', 'categoria' => 'Frenado', 'id_categoria' => $frenos->categoria_id]);
         TipoPieza::factory()->create(['nombre' => 'Bujía', 'fabricante' => 'NGK', 'categoria' => 'Encendido', 'id_categoria' => $motor->categoria_id]);
-        $usuario = $this->usuarioConRol('operario');
+        $operario = $this->usuarioConRol('operario');
 
-        foreach (['Pastillas', 'Ferodo', 'Frenado'] as $busqueda) {
-            $this->actingAs($usuario)->get(route('tipos-pieza.index', ['q' => $busqueda]))
-                ->assertViewHas('tiposPieza', fn ($tipos) => $tipos->total() === 1 && $tipos->first()->nombre === 'Pastillas');
+        $esperados = [
+            'Pastillas' => ['Pastillas'],
+            'Ferodo' => ['Pastillas'],
+            'Frenado' => ['Disco', 'Pastillas'],
+        ];
+
+        foreach ($esperados as $busqueda => $tiposEsperados) {
+            $this->actingAs($operario)->get(route('categorias.index', ['q' => $busqueda]))
+                ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 1
+                    && $categorias->first()->categoria_id === $frenos->categoria_id
+                    && $categorias->first()->tiposPieza->pluck('nombre')->all() === $tiposEsperados);
         }
 
-        $this->actingAs($usuario)->get(route('tipos-pieza.index', ['categoria' => $motor->categoria_id]))
-            ->assertViewHas('tiposPieza', fn ($tipos) => $tipos->total() === 1 && $tipos->first()->nombre === 'Bujía');
-
-        $this->actingAs($usuario)->get(route('tipos-pieza.index', ['q' => 'no-existe']))
+        $this->actingAs($operario)->get(route('categorias.index', ['q' => 'no-existe']))
             ->assertOk()
             ->assertSee('Sin resultados');
     }
 
-    public function test_el_listado_se_pagina(): void
-    {
-        $categoria = $this->categoriaCoherente();
-        TipoPieza::factory()->count(16)->create(['id_categoria' => $categoria->categoria_id]);
-
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('tipos-pieza.index', ['page' => 2]))
-            ->assertViewHas('tiposPieza', fn ($tipos) => $tipos->count() === 1 && $tipos->total() === 16);
-    }
-
     public function test_los_botones_dependen_de_los_permisos(): void
     {
-        $tipo = TipoPieza::factory()->create();
+        $categoria = $this->categoriaCoherente();
+        $tipo = TipoPieza::factory()->create(['id_categoria' => $categoria->categoria_id]);
         $botonDeEdicion = 'data-modal-open="editar-tipo-pieza-'.$tipo->id_pieza.'"';
+        $botonDeAlta = 'data-modal-open="crear-tipo-'.$categoria->categoria_id.'"';
         $formularioDeBorrado = 'name="_method" value="DELETE"';
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('tipos-pieza.index'))
-            ->assertDontSee('Nuevo tipo de pieza')->assertDontSee($botonDeEdicion, false)->assertDontSee($formularioDeBorrado, false);
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))
+            ->assertDontSee($botonDeAlta, false)->assertDontSee($botonDeEdicion, false)->assertDontSee($formularioDeBorrado, false);
 
-        $this->actingAs($this->usuarioConRol('gerente'))->get(route('tipos-pieza.index'))
-            ->assertSee('Nuevo tipo de pieza')->assertSee($botonDeEdicion, false)->assertDontSee($formularioDeBorrado, false);
+        $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
+            ->assertSee($botonDeAlta, false)->assertSee($botonDeEdicion, false)->assertDontSee($formularioDeBorrado, false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))->get(route('tipos-pieza.index'))
-            ->assertSee($botonDeEdicion, false)->assertSee($formularioDeBorrado, false);
+        $this->actingAs($this->usuarioConRol('administrador'))->get(route('categorias.index'))
+            ->assertSee($botonDeAlta, false)->assertSee($botonDeEdicion, false)->assertSee($formularioDeBorrado, false);
     }
 
     public function test_el_operario_no_puede_crear_editar_ni_eliminar(): void
@@ -165,14 +168,14 @@ class TiposPiezaWebTest extends TestCase
         $this->assertSame('Original', $tipo->fresh()->nombre);
     }
 
-    public function test_gerente_y_administrador_crean_conservando_ambos_campos_de_categoria(): void
+    public function test_gerente_y_administrador_crean_desde_la_categoria_y_vuelven_al_listado(): void
     {
         $categoria = $this->categoriaCoherente();
 
         foreach (['gerente', 'administrador'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->post(route('tipos-pieza.store'), $this->datosValidos($categoria))
-                ->assertRedirect(route('tipos-pieza.index'))
+                ->assertRedirect(route('categorias.index'))
                 ->assertSessionHas('success');
         }
 
@@ -192,7 +195,7 @@ class TiposPiezaWebTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('gerente'))
             ->put(route('tipos-pieza.update', $tipo), $this->datosValidos($categoria))
-            ->assertRedirect(route('tipos-pieza.index'))
+            ->assertRedirect(route('categorias.index'))
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('tipo_piezas', [
@@ -202,25 +205,14 @@ class TiposPiezaWebTest extends TestCase
         ]);
     }
 
-    public function test_validacion_de_campos_obligatorios_y_valores_incorrectos(): void
+    public function test_validacion_reabre_el_modal_de_la_categoria(): void
     {
-        $gerente = $this->usuarioConRol('gerente');
-
-        $this->actingAs($gerente)
-            ->from(route('tipos-pieza.index'))
-            ->post(route('tipos-pieza.store'), ['_modal' => 'crear-tipo-pieza'])
-            ->assertRedirect(route('tipos-pieza.index'))
+        $this->actingAs($this->usuarioConRol('gerente'))
+            ->from(route('categorias.index'))
+            ->post(route('tipos-pieza.store'), ['_modal' => 'crear-tipo-1'])
+            ->assertRedirect(route('categorias.index'))
             ->assertSessionHasErrors(['nombre', 'fabricante', 'categoria', 'id_categoria'])
-            ->assertSessionHasInput('_modal', 'crear-tipo-pieza');
-
-        $this->actingAs($gerente)
-            ->post(route('tipos-pieza.store'), [
-                'nombre' => str_repeat('a', 256),
-                'fabricante' => str_repeat('a', 256),
-                'categoria' => str_repeat('a', 256),
-                'id_categoria' => 999999,
-            ])
-            ->assertSessionHasErrors(['nombre', 'fabricante', 'categoria', 'id_categoria']);
+            ->assertSessionHasInput('_modal', 'crear-tipo-1');
 
         $this->assertDatabaseCount('tipo_piezas', 0);
     }
@@ -234,7 +226,7 @@ class TiposPiezaWebTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('tipos-pieza.destroy', $tipo))
-            ->assertRedirect(route('tipos-pieza.index'))
+            ->assertRedirect(route('categorias.index'))
             ->assertSessionHas('success');
 
         $this->assertSoftDeleted($tipo);
@@ -247,7 +239,7 @@ class TiposPiezaWebTest extends TestCase
 
         $this->actingAs($this->usuarioConRol('administrador'))
             ->delete(route('tipos-pieza.destroy', $tipo))
-            ->assertRedirect(route('tipos-pieza.index'))
+            ->assertRedirect(route('categorias.index'))
             ->assertSessionHas('error');
 
         $this->assertNotSoftDeleted($tipo);
