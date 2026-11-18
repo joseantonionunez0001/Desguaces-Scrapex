@@ -11,9 +11,8 @@
 <aside id="app-sidebar" aria-label="Menú principal"
     class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-blue-950 text-blue-100 transition-transform duration-200 lg:static lg:translate-x-0">
     <div class="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-5">
-        <span class="flex size-9 items-center justify-center rounded-lg bg-blue-600 text-white">
-            <x-ui.icon name="truck" class="size-5" />
-        </span>
+        <img src="{{ asset('images/logo.png') }}" alt="" class="h-10 w-auto shrink-0 rounded-md bg-white p-0.5">
+
         <a href="{{ route('dashboard') }}" class="truncate text-base font-bold tracking-tight text-white">{{ config('navegacion.marca') }}</a>
     </div>
 
