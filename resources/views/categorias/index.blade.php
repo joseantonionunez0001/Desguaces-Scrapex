@@ -36,7 +36,7 @@
             <ul class="divide-y divide-slate-200" aria-label="Listado de categorías">
                 @foreach ($categorias as $categoria)
                     <li>
-                        {{-- Acordeón nativo: se abre y cierra con teclado sin JavaScript. Si hay búsqueda, se abren todas para ver los resultados. --}}
+                        {{-- Acordeones nativos (categoría → marca → modelo): se abren y cierran con teclado sin JavaScript. Con búsqueda activa se abren todos. --}}
                         <details class="group" @if ($filtros['q'] !== '') open @endif>
                             <summary class="flex cursor-pointer list-none items-center gap-4 bg-blue-50 px-5 py-4 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden">
                                 <div class="min-w-0 flex-1">
@@ -72,13 +72,27 @@
                                     @endphp
 
                                     @forelse ($tiposPorMarca as $marca => $modelos)
-                                        <section class="mb-4 last:mb-0" aria-label="Marca {{ $marca }}">
-                                            <h4 class="text-sm font-semibold text-blue-950">{{ $marca }}</h4>
-                                            <div class="mt-2 space-y-3 border-l-2 border-blue-100 pl-4">
+                                        <details class="group/marca mb-3 rounded-md border border-slate-200 bg-white last:mb-0" @if ($filtros['q'] !== '') open @endif>
+                                            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-4 py-3 font-semibold text-blue-950 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden">
+                                                <span>{{ $marca }}</span>
+                                                <span class="flex items-center gap-3 text-sm font-normal text-slate-500">
+                                                    {{ $modelos->count() }} {{ $modelos->count() === 1 ? 'modelo' : 'modelos' }}
+                                                    <x-ui.icon name="chevron-down" class="size-4 transition group-open/marca:rotate-180" />
+                                                </span>
+                                            </summary>
+
+                                            <div class="space-y-2 border-t border-slate-200 p-3">
                                                 @foreach ($modelos as $modelo => $tiposDelModelo)
-                                                    <div>
-                                                        <h5 class="text-sm font-medium text-slate-700">{{ $modelo }}</h5>
-                                                        <ul class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Tipos de pieza de {{ $marca }} {{ $modelo }}">
+                                                    <details class="group/modelo rounded-md border border-slate-100 bg-slate-50" @if ($filtros['q'] !== '') open @endif>
+                                                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 [&::-webkit-details-marker]:hidden">
+                                                            <span>{{ $modelo }}</span>
+                                                            <span class="flex items-center gap-3 text-xs font-normal text-slate-500">
+                                                                {{ $tiposDelModelo->count() }} {{ $tiposDelModelo->count() === 1 ? 'tipo de pieza' : 'tipos de pieza' }}
+                                                                <x-ui.icon name="chevron-down" class="size-4 transition group-open/modelo:rotate-180" />
+                                                            </span>
+                                                        </summary>
+
+                                                        <ul class="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Tipos de pieza de {{ $marca }} {{ $modelo }}">
                                                             @foreach ($tiposDelModelo as $tipoPieza)
                                                                 <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
                                                                     <span class="min-w-0">
@@ -102,10 +116,10 @@
                                                                 </li>
                                                             @endforeach
                                                         </ul>
-                                                    </div>
+                                                    </details>
                                                 @endforeach
                                             </div>
-                                        </section>
+                                        </details>
                                     @empty
                                         <p class="text-sm text-slate-500">
                                             {{ $filtros['q'] !== '' ? 'Ningún tipo de esta categoría coincide con la búsqueda.' : 'Sin tipos de pieza.' }}
