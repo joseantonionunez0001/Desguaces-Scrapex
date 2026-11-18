@@ -33,6 +33,8 @@ class CategoriaController extends Controller
                     ->withCount('piezas')
                     ->when($busqueda !== '', fn ($tipos) => $tipos->where(function ($grupo) use ($busqueda): void {
                         $grupo->where('nombre', 'like', "%{$busqueda}%")
+                            ->orWhere('marca', 'like', "%{$busqueda}%")
+                            ->orWhere('modelo', 'like', "%{$busqueda}%")
                             ->orWhere('fabricante', 'like', "%{$busqueda}%")
                             ->orWhere('categoria', 'like', "%{$busqueda}%");
                     }))
@@ -46,6 +48,8 @@ class CategoriaController extends Controller
                     ->orWhereHas('vehiculo', fn ($relacion) => $relacion->where('matricula', 'like', "%{$busqueda}%"))
                     ->orWhereHas('tiposPieza', fn ($relacion) => $relacion->where(function ($tipos) use ($busqueda): void {
                         $tipos->where('nombre', 'like', "%{$busqueda}%")
+                            ->orWhere('marca', 'like', "%{$busqueda}%")
+                            ->orWhere('modelo', 'like', "%{$busqueda}%")
                             ->orWhere('fabricante', 'like', "%{$busqueda}%")
                             ->orWhere('categoria', 'like', "%{$busqueda}%");
                     }));

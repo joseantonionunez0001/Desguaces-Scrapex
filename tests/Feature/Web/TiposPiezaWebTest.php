@@ -41,6 +41,8 @@ class TiposPiezaWebTest extends TestCase
     {
         return [
             'nombre' => 'Alternador 90A',
+            'marca' => 'Seat',
+            'modelo' => 'Ibiza',
             'fabricante' => 'Bosch',
             'categoria' => 'Electricidad',
             'id_categoria' => $categoria->categoria_id,
@@ -81,6 +83,8 @@ class TiposPiezaWebTest extends TestCase
         $categoria = $this->categoriaCoherente('Electricidad', 'Desguace Levante');
         $tipo = TipoPieza::factory()->create([
             'nombre' => 'Alternador 90A',
+            'marca' => 'Seat',
+            'modelo' => 'Ibiza',
             'fabricante' => 'Bosch',
             'categoria' => 'Texto libre',
             'id_categoria' => $categoria->categoria_id,
@@ -93,6 +97,7 @@ class TiposPiezaWebTest extends TestCase
                 ->assertOk()
                 ->assertSee('Electricidad')
                 ->assertSee('Alternador 90A')
+                ->assertSee('Seat Ibiza')
                 ->assertSee('Bosch')
                 ->assertSee('2 piezas')
                 ->assertViewHas('categorias', fn ($categorias) => $categorias->first()->tiposPieza->first()->piezas_count === 2);
@@ -182,6 +187,8 @@ class TiposPiezaWebTest extends TestCase
         $this->assertDatabaseCount('tipo_piezas', 2);
         $this->assertDatabaseHas('tipo_piezas', [
             'nombre' => 'Alternador 90A',
+            'marca' => 'Seat',
+            'modelo' => 'Ibiza',
             'fabricante' => 'Bosch',
             'categoria' => 'Electricidad',
             'id_categoria' => $categoria->categoria_id,
@@ -211,7 +218,7 @@ class TiposPiezaWebTest extends TestCase
             ->from(route('categorias.index'))
             ->post(route('tipos-pieza.store'), ['_modal' => 'crear-tipo-1'])
             ->assertRedirect(route('categorias.index'))
-            ->assertSessionHasErrors(['nombre', 'fabricante', 'categoria', 'id_categoria'])
+            ->assertSessionHasErrors(['nombre', 'marca', 'modelo', 'fabricante', 'categoria', 'id_categoria'])
             ->assertSessionHasInput('_modal', 'crear-tipo-1');
 
         $this->assertDatabaseCount('tipo_piezas', 0);

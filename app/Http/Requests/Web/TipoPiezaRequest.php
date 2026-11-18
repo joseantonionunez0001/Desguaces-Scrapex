@@ -25,6 +25,8 @@ class TipoPiezaRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'max:255'],
+            'marca' => ['required', 'string', 'max:255'],
+            'modelo' => ['required', 'string', 'max:255'],
             'fabricante' => ['required', 'string', 'max:255'],
             'categoria' => ['required', 'string', 'max:255'],
             'id_categoria' => ['required', Rule::exists('categorias', 'categoria_id')->whereNull('deleted_at')],
@@ -51,6 +53,8 @@ class TipoPiezaRequest extends FormRequest
     {
         return [
             'nombre' => 'nombre',
+            'marca' => 'marca',
+            'modelo' => 'modelo',
             'fabricante' => 'fabricante',
             'categoria' => 'categoría (texto)',
             'id_categoria' => 'categoría relacionada',

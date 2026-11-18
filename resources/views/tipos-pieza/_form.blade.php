@@ -18,6 +18,10 @@
 
     <div class="grid gap-4">
         <x-form.input name="nombre" label="Nombre" :required="true" maxlength="255" :value="$tipoPieza?->nombre" :use-old="$usarOld" />
+        <div class="grid gap-4 sm:grid-cols-2">
+            <x-form.input name="marca" label="Marca" :required="true" maxlength="255" :value="$tipoPieza?->marca" :use-old="$usarOld" placeholder="Por ejemplo: Seat" />
+            <x-form.input name="modelo" label="Modelo" :required="true" maxlength="255" :value="$tipoPieza?->modelo" :use-old="$usarOld" placeholder="Por ejemplo: Ibiza" />
+        </div>
         <x-form.input name="fabricante" label="Fabricante" :required="true" maxlength="255" :value="$tipoPieza?->fabricante" :use-old="$usarOld" />
         <div>
             <x-form.input name="categoria" label="Categoría (texto)" :required="true" maxlength="255" :value="$tipoPieza?->categoria" :use-old="$usarOld"

@@ -66,7 +66,7 @@
                                             <li class="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
                                                 <span class="min-w-0">
                                                     <span class="block truncate font-medium text-slate-900">{{ $tipoPieza->nombre }}</span>
-                                                    <span class="block truncate text-xs text-slate-500">{{ $tipoPieza->fabricante }}</span>
+                                                    <span class="block truncate text-xs text-slate-500">{{ $tipoPieza->marca }} {{ $tipoPieza->modelo }} · {{ $tipoPieza->fabricante }}</span>
                                                 </span>
                                                 <span class="flex shrink-0 items-center gap-2">
                                                     <span class="whitespace-nowrap text-xs tabular-nums text-slate-500">{{ $tipoPieza->piezas_count }} piezas</span>
