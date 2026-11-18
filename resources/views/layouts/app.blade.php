@@ -6,6 +6,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Panel') · {{ config('navegacion.marca') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- Estilos de los avisos flotantes (PHPFlasher). Se publican con php artisan flasher:install. --}}
+    <link rel="stylesheet" href="{{ asset('vendor/flasher/flasher.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/flasher/themes/flasher/flasher.min.css') }}">
 </head>
 <body class="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
     {{--
