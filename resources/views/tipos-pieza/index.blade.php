@@ -41,7 +41,9 @@
                         <th scope="col">Categoría (texto)</th>
                         <th scope="col">Categoría relacionada</th>
                         <th scope="col" class="text-right">Piezas</th>
-                        <th scope="col" class="text-right">Acciones</th>
+                        @canany(['tipo_piezas.editar', 'tipo_piezas.eliminar'])
+                            <th scope="col" class="text-right">Acciones</th>
+                        @endcanany
                     </tr>
                 </x-slot:head>
                 @foreach ($tiposPieza as $tipoPieza)
@@ -58,6 +60,7 @@
                             @endif
                         </td>
                         <td class="text-right tabular-nums">{{ $tipoPieza->piezas_count }}</td>
+                        @canany(['tipo_piezas.editar', 'tipo_piezas.eliminar'])
                         <td>
                             <div class="flex justify-end gap-2">
                                 @can('tipo_piezas.editar')
@@ -73,6 +76,7 @@
                                 @endcan
                             </div>
                         </td>
+                        @endcanany
                     </tr>
                 @endforeach
             </x-ui.table>

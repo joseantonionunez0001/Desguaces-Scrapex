@@ -42,7 +42,9 @@
                         <th scope="col">Vehículo</th>
                         <th scope="col" class="text-right">Tipos de pieza</th>
                         <th scope="col" class="text-right">Movimientos</th>
-                        <th scope="col" class="text-right">Acciones</th>
+                        @canany(['categorias.editar', 'categorias.eliminar'])
+                            <th scope="col" class="text-right">Acciones</th>
+                        @endcanany
                     </tr>
                 </x-slot:head>
                 @foreach ($categorias as $categoria)
@@ -53,6 +55,7 @@
                         <td>{{ $categoria->vehiculo?->matricula ?? '—' }}</td>
                         <td class="text-right tabular-nums">{{ $categoria->tipos_pieza_count }}</td>
                         <td class="text-right tabular-nums">{{ $categoria->movimientos_count }}</td>
+                        @canany(['categorias.editar', 'categorias.eliminar'])
                         <td>
                             <div class="flex justify-end gap-2">
                                 @can('categorias.editar')
@@ -68,6 +71,7 @@
                                 @endcan
                             </div>
                         </td>
+                        @endcanany
                     </tr>
                 @endforeach
             </x-ui.table>
