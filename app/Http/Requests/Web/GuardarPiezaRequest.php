@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Models\TipoPieza;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Validación de alta y edición de piezas.
@@ -32,7 +33,7 @@ class GuardarPiezaRequest extends FormRequest
             'estado' => ['required', 'string', 'max:50'],
             'stock' => ['required', 'integer', 'min:0', 'max:4294967295'],
             'stock_minimo' => ['required', 'integer', 'min:0', 'max:4294967295'],
-            'id_tipo_pieza' => ['required', Rule::exists('tipo_piezas', 'id_pieza')->whereNull('deleted_at')],
+            'id_tipo_pieza' => ['required', new ExisteEnMiSede(TipoPieza::class)],
         ];
     }
 

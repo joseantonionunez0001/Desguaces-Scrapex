@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pieza;
+use App\Models\TipoPieza;
+use App\Models\User;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class PiezaApiController extends Controller
@@ -15,7 +18,7 @@ class PiezaApiController extends Controller
 
         return response()->json([
             'data' => $piezas,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +29,7 @@ class PiezaApiController extends Controller
 
         return response()->json([
             'data' => $pieza,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -39,11 +42,11 @@ class PiezaApiController extends Controller
             'estado' => 'required|string|max:50',
             'stock' => 'required|integer|min:0',
             'stock_minimo' => 'required|integer|min:0',
-            'id_usuario' => 'required|exists:users,id',
-            'id_tipo_pieza' => 'required|exists:tipo_piezas,id_pieza',
+            'id_usuario' => ['required', new ExisteEnMiSede(User::class)],
+            'id_tipo_pieza' => ['required', new ExisteEnMiSede(TipoPieza::class)],
         ]);
 
-        $pieza = new Pieza();
+        $pieza = new Pieza;
         $pieza->nombre = $datos['nombre'];
         $pieza->precio = $datos['precio'];
         $pieza->estado = $datos['estado'];
@@ -55,7 +58,7 @@ class PiezaApiController extends Controller
 
         return response()->json([
             'data' => $pieza,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -70,8 +73,8 @@ class PiezaApiController extends Controller
             'estado' => 'required|string|max:50',
             'stock' => 'required|integer|min:0',
             'stock_minimo' => 'required|integer|min:0',
-            'id_usuario' => 'required|exists:users,id',
-            'id_tipo_pieza' => 'required|exists:tipo_piezas,id_pieza',
+            'id_usuario' => ['required', new ExisteEnMiSede(User::class)],
+            'id_tipo_pieza' => ['required', new ExisteEnMiSede(TipoPieza::class)],
         ]);
 
         $pieza->nombre = $datos['nombre'];
@@ -85,7 +88,7 @@ class PiezaApiController extends Controller
 
         return response()->json([
             'data' => $pieza,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -97,7 +100,7 @@ class PiezaApiController extends Controller
 
         return response()->json([
             'data' => 'Pieza eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

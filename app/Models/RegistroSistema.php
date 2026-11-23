@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorDesguace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RegistroSistema extends Model
 {
-    use HasFactory;
+    use HasFactory, RestringidoPorDesguace;
 
     protected $table = 'registro_sistema';
+
     protected $primaryKey = 'id_registro';
 
     /**
@@ -33,5 +36,11 @@ class RegistroSistema extends Model
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'id_usuario', 'id');
+    }
+
+    // Alcance por desguace: los registros del personal de la sede (a traves del usuario autor).
+    public function scopeDelDesguace(Builder $consulta, int $idDesguace): void
+    {
+        $consulta->whereHas('usuario', fn (Builder $usuario) => $usuario->withTrashed()->delDesguace($idDesguace));
     }
 }

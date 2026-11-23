@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Desguace;
 use App\Models\Patio;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class PatioApiController extends Controller
@@ -15,7 +17,7 @@ class PatioApiController extends Controller
 
         return response()->json([
             'data' => $patios,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class PatioApiController extends Controller
 
         return response()->json([
             'data' => $patio,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,12 +36,12 @@ class PatioApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'codigo' => 'required|string|max:50',
             'nombre' => 'required|string|max:255',
         ]);
 
-        $patio = new Patio();
+        $patio = new Patio;
         $patio->id_desguace = $datos['id_desguace'];
         $patio->codigo = $datos['codigo'];
         $patio->nombre = $datos['nombre'];
@@ -47,7 +49,7 @@ class PatioApiController extends Controller
 
         return response()->json([
             'data' => $patio,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -57,7 +59,7 @@ class PatioApiController extends Controller
         $patio = Patio::findOrFail($id);
 
         $datos = $request->validate([
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'codigo' => 'required|string|max:50',
             'nombre' => 'required|string|max:255',
         ]);
@@ -69,7 +71,7 @@ class PatioApiController extends Controller
 
         return response()->json([
             'data' => $patio,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -81,7 +83,7 @@ class PatioApiController extends Controller
 
         return response()->json([
             'data' => 'Patio eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

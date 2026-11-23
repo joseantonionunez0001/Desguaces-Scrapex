@@ -18,6 +18,7 @@
         </div>
     </dl>
 
+    @if ($mostrarInventario)
     <div class="mt-5 grid grid-cols-3 gap-3 text-center">
         <div class="rounded-lg bg-slate-50 p-3">
             <p class="text-2xl font-bold text-blue-950">{{ $desguace->vehiculos_count }}</p>
@@ -32,6 +33,18 @@
             <p class="text-xs text-slate-500">Patios</p>
         </div>
     </div>
+    @endif
+
+    @if ($mostrarAdministrador)
+        <div class="mt-5 rounded-lg bg-slate-50 p-3 text-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Administrador del desguace</p>
+            @forelse ($administradores->get($desguace->id_desguace, collect()) as $administrador)
+                <p class="mt-1 text-slate-800">{{ $administrador->name }} · {{ $administrador->email }}</p>
+            @empty
+                <p class="mt-1 text-amber-700">Sin administrador asignado.</p>
+            @endforelse
+        </div>
+    @endif
 
     <div class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
         @can('vehiculos.ver')

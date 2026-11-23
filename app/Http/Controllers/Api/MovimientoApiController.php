@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Categoria;
 use App\Models\Movimiento;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class MovimientoApiController extends Controller
@@ -15,7 +17,7 @@ class MovimientoApiController extends Controller
 
         return response()->json([
             'data' => $movimientos,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class MovimientoApiController extends Controller
 
         return response()->json([
             'data' => $movimiento,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -37,10 +39,10 @@ class MovimientoApiController extends Controller
             'tipo_movimiento' => 'required|string|max:50',
             'fecha' => 'required|date',
             'cantidad' => 'required|integer|min:1',
-            'id_categoria' => 'required|exists:categorias,categoria_id',
+            'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ]);
 
-        $movimiento = new Movimiento();
+        $movimiento = new Movimiento;
         $movimiento->tipo_movimiento = $datos['tipo_movimiento'];
         $movimiento->fecha = $datos['fecha'];
         $movimiento->cantidad = $datos['cantidad'];
@@ -49,7 +51,7 @@ class MovimientoApiController extends Controller
 
         return response()->json([
             'data' => $movimiento,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -62,7 +64,7 @@ class MovimientoApiController extends Controller
             'tipo_movimiento' => 'required|string|max:50',
             'fecha' => 'required|date',
             'cantidad' => 'required|integer|min:1',
-            'id_categoria' => 'required|exists:categorias,categoria_id',
+            'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ]);
 
         $movimiento->tipo_movimiento = $datos['tipo_movimiento'];
@@ -73,7 +75,7 @@ class MovimientoApiController extends Controller
 
         return response()->json([
             'data' => $movimiento,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -85,7 +87,7 @@ class MovimientoApiController extends Controller
 
         return response()->json([
             'data' => 'Movimiento eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

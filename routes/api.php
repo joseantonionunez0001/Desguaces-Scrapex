@@ -30,46 +30,54 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', [ApiAuthController::class, 'logout']);
     Route::get('user', [ApiAuthController::class, 'me']);
 
-    // Recurso => [controlador, prefijo de permisos].
-    // Cada operación exige "<prefijo>.<accion>" (ver, crear, editar, eliminar).
-    $recursos = [
-        'desguaces' => [DesguaceApiController::class, 'desguaces'],
-        'modulos' => [ModuloApiController::class, 'modulos'],
-        'pasillos' => [PasilloApiController::class, 'pasillos'],
-        'estanterias' => [EstanteriaApiController::class, 'estanterias'],
-        'etiquetas' => [EtiquetaApiController::class, 'etiquetas'],
-        'patios' => [PatioApiController::class, 'patios'],
-        'sectores' => [SectorApiController::class, 'sectores'],
-        'filas' => [FilaApiController::class, 'filas'],
-        'posiciones' => [PosicionApiController::class, 'posiciones'],
-        'niveles' => [NivelApiController::class, 'niveles'],
-        'vehiculos' => [VehiculoApiController::class, 'vehiculos'],
-        'ubicaciones-vehiculo' => [UbicacionVehiculoApiController::class, 'ubicaciones_vehiculo'],
-        'categorias' => [CategoriaApiController::class, 'categorias'],
-        'tipo-piezas' => [TipoPiezaApiController::class, 'tipo_piezas'],
-        'piezas' => [PiezaApiController::class, 'piezas'],
-        'movimientos' => [MovimientoApiController::class, 'movimientos'],
-    ];
+    // Todo lo siguiente exige, ademas del permiso, una sede valida para los roles de desguace.
+    Route::middleware('desguace.asignado')->group(function () {
 
-    foreach ($recursos as $ruta => [$controlador, $permiso]) {
-        Route::get($ruta, [$controlador, 'index'])->middleware("permission:{$permiso}.ver");
-        Route::post($ruta, [$controlador, 'store'])->middleware("permission:{$permiso}.crear");
-        Route::get("{$ruta}/{id}", [$controlador, 'show'])->middleware("permission:{$permiso}.ver");
-        Route::match(['put', 'patch'], "{$ruta}/{id}", [$controlador, 'update'])->middleware("permission:{$permiso}.editar");
-        Route::delete("{$ruta}/{id}", [$controlador, 'destroy'])->middleware("permission:{$permiso}.eliminar");
-    }
+        // Recurso => [controlador, prefijo de permisos].
+        // Cada operación exige "<prefijo>.<accion>" (ver, crear, editar, eliminar).
+        $recursos = [
+            'desguaces' => [DesguaceApiController::class, 'desguaces'],
+            'modulos' => [ModuloApiController::class, 'modulos'],
+            'pasillos' => [PasilloApiController::class, 'pasillos'],
+            'estanterias' => [EstanteriaApiController::class, 'estanterias'],
+            'etiquetas' => [EtiquetaApiController::class, 'etiquetas'],
+            'patios' => [PatioApiController::class, 'patios'],
+            'sectores' => [SectorApiController::class, 'sectores'],
+            'filas' => [FilaApiController::class, 'filas'],
+            'posiciones' => [PosicionApiController::class, 'posiciones'],
+            'niveles' => [NivelApiController::class, 'niveles'],
+            'vehiculos' => [VehiculoApiController::class, 'vehiculos'],
+            'ubicaciones-vehiculo' => [UbicacionVehiculoApiController::class, 'ubicaciones_vehiculo'],
+            'categorias' => [CategoriaApiController::class, 'categorias'],
+            'tipo-piezas' => [TipoPiezaApiController::class, 'tipo_piezas'],
+            'piezas' => [PiezaApiController::class, 'piezas'],
+            'movimientos' => [MovimientoApiController::class, 'movimientos'],
+        ];
 
-    // Usuarios: solo administradores (permisos usuarios.*).
-    Route::get('usuarios', [UsuarioApiController::class, 'index'])->middleware('permission:usuarios.ver');
-    Route::post('usuarios', [UsuarioApiController::class, 'store'])->middleware('permission:usuarios.crear');
-    Route::get('usuarios/{id}', [UsuarioApiController::class, 'show'])->middleware('permission:usuarios.ver');
-    Route::match(['put', 'patch'], 'usuarios/{id}', [UsuarioApiController::class, 'update'])->middleware('permission:usuarios.editar');
-    Route::delete('usuarios/{id}', [UsuarioApiController::class, 'destroy'])->middleware('permission:usuarios.eliminar');
-    Route::put('usuarios/{id}/rol', [UsuarioApiController::class, 'asignarRol'])->middleware('permission:usuarios.asignar_roles');
-    Route::delete('usuarios/{id}/roles/{rol}', [UsuarioApiController::class, 'retirarRol'])->middleware('permission:usuarios.asignar_roles');
+        foreach ($recursos as $ruta => [$controlador, $permiso]) {
+            Route::get($ruta, [$controlador, 'index'])->middleware("permission:{$permiso}.ver");
+            Route::post($ruta, [$controlador, 'store'])->middleware("permission:{$permiso}.crear");
+            Route::get("{$ruta}/{id}", [$controlador, 'show'])->middleware("permission:{$permiso}.ver");
+            Route::match(['put', 'patch'], "{$ruta}/{id}", [$controlador, 'update'])->middleware("permission:{$permiso}.editar");
+            Route::delete("{$ruta}/{id}", [$controlador, 'destroy'])->middleware("permission:{$permiso}.eliminar");
+        }
 
-    // Registro de sistema (auditoría): solo lectura y alta. Nunca se modifica ni se borra.
-    Route::get('registro-sistema', [RegistroSistemaApiController::class, 'index'])->middleware('permission:registro_sistema.ver');
-    Route::get('registro-sistema/{id}', [RegistroSistemaApiController::class, 'show'])->middleware('permission:registro_sistema.ver');
-    Route::post('registro-sistema', [RegistroSistemaApiController::class, 'store'])->middleware('permission:registro_sistema.crear');
+        // Plataforma: designar o sustituir al administrador de una sede.
+        Route::put('desguaces/{id}/administrador', [DesguaceApiController::class, 'asignarAdministrador'])->middleware('permission:desguaces.asignar_administrador');
+
+        // Usuarios: administracion de la plataforma y administradores de desguace (permisos usuarios.*).
+        Route::get('usuarios', [UsuarioApiController::class, 'index'])->middleware('permission:usuarios.ver');
+        Route::post('usuarios', [UsuarioApiController::class, 'store'])->middleware('permission:usuarios.crear');
+        Route::get('usuarios/{id}', [UsuarioApiController::class, 'show'])->middleware('permission:usuarios.ver');
+        Route::match(['put', 'patch'], 'usuarios/{id}', [UsuarioApiController::class, 'update'])->middleware('permission:usuarios.editar');
+        Route::delete('usuarios/{id}', [UsuarioApiController::class, 'destroy'])->middleware('permission:usuarios.eliminar');
+        Route::put('usuarios/{id}/desguace', [UsuarioApiController::class, 'asignarDesguace'])->middleware('permission:usuarios.asignar_desguace');
+        Route::put('usuarios/{id}/rol', [UsuarioApiController::class, 'asignarRol'])->middleware('permission:usuarios.asignar_roles');
+        Route::delete('usuarios/{id}/roles/{rol}', [UsuarioApiController::class, 'retirarRol'])->middleware('permission:usuarios.asignar_roles');
+
+        // Registro de sistema (auditoría): solo lectura y alta. Nunca se modifica ni se borra.
+        Route::get('registro-sistema', [RegistroSistemaApiController::class, 'index'])->middleware('permission:registro_sistema.ver');
+        Route::get('registro-sistema/{id}', [RegistroSistemaApiController::class, 'show'])->middleware('permission:registro_sistema.ver');
+        Route::post('registro-sistema', [RegistroSistemaApiController::class, 'store'])->middleware('permission:registro_sistema.crear');
+    });
 });

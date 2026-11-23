@@ -3,8 +3,12 @@
 use App\Http\Controllers\Web\DesguaceController;
 use Illuminate\Support\Facades\Route;
 
-// Gestión de desguaces: crear, editar y eliminar solo lo puede hacer el administrador.
+// Gestión de desguaces: crear, editar, eliminar y designar administrador es tarea del administrador de plataforma.
 Route::middleware('auth')->group(function () {
+    Route::put('/desguaces/{desguace}/administrador', [DesguaceController::class, 'asignarAdministrador'])
+        ->middleware('permission:desguaces.asignar_administrador')
+        ->name('desguaces.administrador.update');
+
     Route::get('/desguaces', [DesguaceController::class, 'index'])
         ->middleware('permission:desguaces.ver')
         ->name('desguaces.index');

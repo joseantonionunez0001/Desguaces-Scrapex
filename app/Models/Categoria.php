@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorDesguace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,9 +12,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Categoria extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, RestringidoPorDesguace, SoftDeletes;
 
     protected $table = 'categorias';
+
     protected $primaryKey = 'categoria_id';
 
     protected $fillable = [
@@ -45,5 +48,11 @@ class Categoria extends Model
     public function movimientos(): HasMany
     {
         return $this->hasMany(Movimiento::class, 'id_categoria', 'categoria_id');
+    }
+
+    // Alcance por desguace: usa las relaciones reales del modelo.
+    public function scopeDelDesguace(Builder $consulta, int $idDesguace): void
+    {
+        $consulta->where($consulta->getModel()->qualifyColumn('id_desguace'), $idDesguace);
     }
 }

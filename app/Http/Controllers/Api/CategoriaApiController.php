@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Categoria;
+use App\Models\Desguace;
+use App\Models\Modulo;
+use App\Models\Vehiculo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class CategoriaApiController extends Controller
@@ -15,7 +19,7 @@ class CategoriaApiController extends Controller
 
         return response()->json([
             'data' => $categorias,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +30,7 @@ class CategoriaApiController extends Controller
 
         return response()->json([
             'data' => $categoria,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -35,12 +39,12 @@ class CategoriaApiController extends Controller
     {
         $datos = $request->validate([
             'nombre' => 'required|string|max:255',
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
-            'id_modulo' => 'required|exists:modulos,id_modulo',
-            'id_vehiculo' => 'nullable|exists:vehiculos,id_vehiculo',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
+            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
+            'id_vehiculo' => ['nullable', new ExisteEnMiSede(Vehiculo::class)],
         ]);
 
-        $categoria = new Categoria();
+        $categoria = new Categoria;
         $categoria->nombre = $datos['nombre'];
         $categoria->id_desguace = $datos['id_desguace'];
         $categoria->id_modulo = $datos['id_modulo'];
@@ -49,7 +53,7 @@ class CategoriaApiController extends Controller
 
         return response()->json([
             'data' => $categoria,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -60,9 +64,9 @@ class CategoriaApiController extends Controller
 
         $datos = $request->validate([
             'nombre' => 'required|string|max:255',
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
-            'id_modulo' => 'required|exists:modulos,id_modulo',
-            'id_vehiculo' => 'nullable|exists:vehiculos,id_vehiculo',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
+            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
+            'id_vehiculo' => ['nullable', new ExisteEnMiSede(Vehiculo::class)],
         ]);
 
         $categoria->nombre = $datos['nombre'];
@@ -73,7 +77,7 @@ class CategoriaApiController extends Controller
 
         return response()->json([
             'data' => $categoria,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -85,7 +89,7 @@ class CategoriaApiController extends Controller
 
         return response()->json([
             'data' => 'Categoria eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

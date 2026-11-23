@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Models\Desguace;
 use App\Models\Modulo;
+use App\Models\Vehiculo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
@@ -28,9 +30,9 @@ class CategoriaRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'max:255'],
-            'id_desguace' => ['required', Rule::exists('desguaces', 'id_desguace')->whereNull('deleted_at')],
-            'id_modulo' => ['required', Rule::exists('modulos', 'id_modulo')->whereNull('deleted_at')],
-            'id_vehiculo' => ['nullable', Rule::exists('vehiculos', 'id_vehiculo')->whereNull('deleted_at')],
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
+            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
+            'id_vehiculo' => ['nullable', new ExisteEnMiSede(Vehiculo::class)],
         ];
     }
 

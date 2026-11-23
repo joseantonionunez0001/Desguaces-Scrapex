@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Estanteria;
 use App\Models\Etiqueta;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class EtiquetaApiController extends Controller
@@ -15,7 +17,7 @@ class EtiquetaApiController extends Controller
 
         return response()->json([
             'data' => $etiquetas,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class EtiquetaApiController extends Controller
 
         return response()->json([
             'data' => $etiqueta,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,18 +36,18 @@ class EtiquetaApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_estanteria' => 'required|exists:estanterias,id_estanteria',
+            'id_estanteria' => ['required', new ExisteEnMiSede(Estanteria::class)],
             'numero_etiqueta' => 'required|string|max:50',
         ]);
 
-        $etiqueta = new Etiqueta();
+        $etiqueta = new Etiqueta;
         $etiqueta->id_estanteria = $datos['id_estanteria'];
         $etiqueta->numero_etiqueta = $datos['numero_etiqueta'];
         $etiqueta->save();
 
         return response()->json([
             'data' => $etiqueta,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class EtiquetaApiController extends Controller
         $etiqueta = Etiqueta::findOrFail($id);
 
         $datos = $request->validate([
-            'id_estanteria' => 'required|exists:estanterias,id_estanteria',
+            'id_estanteria' => ['required', new ExisteEnMiSede(Estanteria::class)],
             'numero_etiqueta' => 'required|string|max:50',
         ]);
 
@@ -65,7 +67,7 @@ class EtiquetaApiController extends Controller
 
         return response()->json([
             'data' => $etiqueta,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -77,7 +79,7 @@ class EtiquetaApiController extends Controller
 
         return response()->json([
             'data' => 'Etiqueta eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

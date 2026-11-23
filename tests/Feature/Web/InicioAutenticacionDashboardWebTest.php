@@ -140,7 +140,8 @@ class InicioAutenticacionDashboardWebTest extends TestCase
 
     public function test_el_dashboard_calcula_los_indicadores_con_datos_reales(): void
     {
-        $operario = $this->usuarioConRol(RoleSeeder::OPERARIO);
+        // El gerente consulta vehículos, piezas y movimientos (el operario ya no ve movimientos).
+        $operario = $this->usuarioConRol(RoleSeeder::GERENTE);
         Vehiculo::factory()->count(3)->create();
         $categoria = Categoria::factory()->create();
 
@@ -215,7 +216,7 @@ class InicioAutenticacionDashboardWebTest extends TestCase
 
     public function test_el_administrador_ve_el_acceso_a_usuarios_en_el_menu(): void
     {
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMINISTRADOR))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('dashboard'))
             ->assertOk()
             ->assertSee(route('admin.usuarios.index'), false)

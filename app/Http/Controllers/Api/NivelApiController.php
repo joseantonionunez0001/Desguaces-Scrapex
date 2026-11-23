@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Nivel;
+use App\Models\Posicion;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class NivelApiController extends Controller
@@ -15,7 +17,7 @@ class NivelApiController extends Controller
 
         return response()->json([
             'data' => $niveles,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class NivelApiController extends Controller
 
         return response()->json([
             'data' => $nivel,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,18 +36,18 @@ class NivelApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_posicion' => 'required|exists:posiciones,id_posicion',
+            'id_posicion' => ['required', new ExisteEnMiSede(Posicion::class)],
             'numero_nivel' => 'required|string|max:50',
         ]);
 
-        $nivel = new Nivel();
+        $nivel = new Nivel;
         $nivel->id_posicion = $datos['id_posicion'];
         $nivel->numero_nivel = $datos['numero_nivel'];
         $nivel->save();
 
         return response()->json([
             'data' => $nivel,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class NivelApiController extends Controller
         $nivel = Nivel::findOrFail($id);
 
         $datos = $request->validate([
-            'id_posicion' => 'required|exists:posiciones,id_posicion',
+            'id_posicion' => ['required', new ExisteEnMiSede(Posicion::class)],
             'numero_nivel' => 'required|string|max:50',
         ]);
 
@@ -65,7 +67,7 @@ class NivelApiController extends Controller
 
         return response()->json([
             'data' => $nivel,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -77,7 +79,7 @@ class NivelApiController extends Controller
 
         return response()->json([
             'data' => 'Nivel eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

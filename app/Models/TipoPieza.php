@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RestringidoPorDesguace;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TipoPieza extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, RestringidoPorDesguace, SoftDeletes;
 
     protected $table = 'tipo_piezas';
 
@@ -37,5 +39,11 @@ class TipoPieza extends Model
     public function piezas(): HasMany
     {
         return $this->hasMany(Pieza::class, 'id_tipo_pieza', 'id_pieza');
+    }
+
+    // Alcance por desguace: usa las relaciones reales del modelo.
+    public function scopeDelDesguace(Builder $consulta, int $idDesguace): void
+    {
+        $this->enSede($consulta, 'categoriaRelacionada', $idDesguace);
     }
 }

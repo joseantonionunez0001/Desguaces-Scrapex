@@ -8,6 +8,8 @@ use App\Models\Modulo;
 use App\Models\Movimiento;
 use App\Models\TipoPieza;
 use App\Models\Vehiculo;
+use Database\Factories\DesguaceFactory;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -24,7 +26,9 @@ class CategoriasWebTest extends TestCase
 
     private function categoriaCoherente(array $atributos = [], string $desguace = 'Desguace Norte', string $modulo = 'Módulo A'): Categoria
     {
-        $desguaceCreado = Desguace::factory()->create(['nombre' => $desguace]);
+        // Las categorías se crean en la sede de las cuentas de prueba (la sede por defecto).
+        $desguaceCreado = Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
+        $desguaceCreado->update(['nombre' => $desguace]);
         $moduloCreado = Modulo::factory()->create(['id_desguace' => $desguaceCreado->id_desguace, 'nombre_modulo' => $modulo]);
 
         return Categoria::factory()->create($atributos + [
@@ -38,7 +42,7 @@ class CategoriasWebTest extends TestCase
      */
     private function datosValidos(?Desguace $desguace = null): array
     {
-        $desguace ??= Desguace::factory()->create();
+        $desguace ??= Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
         $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
 
         return [
@@ -73,7 +77,10 @@ class CategoriasWebTest extends TestCase
         TipoPieza::factory()->count(2)->create(['id_categoria' => $categoria->categoria_id]);
         Movimiento::factory()->count(3)->create(['id_categoria' => $categoria->categoria_id]);
 
-        foreach (['operario', 'gerente', 'administrador'] as $rol) {
+        // Categorías es un módulo de gestión: el operario no entra.
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))->assertForbidden();
+
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('categorias.index'))
                 ->assertOk()
@@ -99,7 +106,8 @@ class CategoriasWebTest extends TestCase
     {
         $this->categoriaCoherente(['nombre' => 'Motor'], 'Desguace Norte', 'Módulo A');
         $frenos = $this->categoriaCoherente(['nombre' => 'Frenos'], 'Desguace Sur', 'Módulo B');
-        $usuario = $this->usuarioConRol('operario');
+        $otraSede = Desguace::factory()->create();
+        $usuario = $this->usuarioConRol('gerente');
 
         $this->actingAs($usuario)->get(route('categorias.index', ['q' => 'Frenos']))
             ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 1);
@@ -108,9 +116,11 @@ class CategoriasWebTest extends TestCase
             ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 1
                 && $categorias->first()->categoria_id === $frenos->categoria_id);
 
+        // El filtro por desguace solo puede devolver datos de la sede propia.
         $this->actingAs($usuario)->get(route('categorias.index', ['desguace' => $frenos->id_desguace]))
-            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 1
-                && $categorias->first()->categoria_id === $frenos->categoria_id);
+            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 2);
+        $this->actingAs($usuario)->get(route('categorias.index', ['desguace' => $otraSede->id_desguace]))
+            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 0);
 
         $this->actingAs($usuario)->get(route('categorias.index', ['q' => 'no-existe']))
             ->assertOk()
@@ -123,7 +133,7 @@ class CategoriasWebTest extends TestCase
         $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
         Categoria::factory()->count(16)->create(['id_desguace' => $desguace->id_desguace, 'id_modulo' => $modulo->id_modulo]);
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('categorias.index', ['page' => 2]))
             ->assertViewHas('categorias', fn ($categorias) => $categorias->count() === 1 && $categorias->total() === 16);
     }
@@ -134,11 +144,7 @@ class CategoriasWebTest extends TestCase
         $botonDeEdicion = 'data-modal-open="editar-categoria-'.$categoria->categoria_id.'"';
         $formularioDeBorrado = 'name="_method" value="DELETE"';
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))
-            ->assertOk()
-            ->assertDontSee('Nueva categoría')
-            ->assertDontSee($botonDeEdicion, false)
-            ->assertDontSee($formularioDeBorrado, false);
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))->assertForbidden();
 
         $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
             ->assertOk()
@@ -146,7 +152,7 @@ class CategoriasWebTest extends TestCase
             ->assertSee($botonDeEdicion, false)
             ->assertDontSee($formularioDeBorrado, false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))->get(route('categorias.index'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get(route('categorias.index'))
             ->assertSee($botonDeEdicion, false)
             ->assertSee($formularioDeBorrado, false);
     }
@@ -166,7 +172,7 @@ class CategoriasWebTest extends TestCase
 
     public function test_gerente_y_administrador_crean_categorias(): void
     {
-        foreach (['gerente', 'administrador'] as $rol) {
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->post(route('categorias.store'), $this->datosValidos())
                 ->assertRedirect(route('categorias.index'))
@@ -257,7 +263,7 @@ class CategoriasWebTest extends TestCase
     public function test_el_modulo_debe_pertenecer_al_desguace_elegido(): void
     {
         $desguace = Desguace::factory()->create();
-        $moduloDeOtroDesguace = Modulo::factory()->create();
+        $moduloDeOtroDesguace = Modulo::factory()->create(['id_desguace' => Desguace::factory()->create()->id_desguace]);
         $gerente = $this->usuarioConRol('gerente');
 
         $this->actingAs($gerente)
@@ -266,7 +272,8 @@ class CategoriasWebTest extends TestCase
                 'id_desguace' => $desguace->id_desguace,
                 'id_modulo' => $moduloDeOtroDesguace->id_modulo,
             ])
-            ->assertSessionHasErrors(['id_modulo' => 'El módulo seleccionado no pertenece al desguace elegido.']);
+            // El módulo es de otra sede: se rechaza antes incluso de comprobar la coherencia.
+            ->assertSessionHasErrors(['id_modulo' => 'El valor seleccionado en módulo no existe o no pertenece a tu desguace.']);
 
         $categoria = $this->categoriaCoherente();
         $this->actingAs($gerente)
@@ -287,7 +294,7 @@ class CategoriasWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('gerente'))->delete(route('categorias.destroy', $categoria))->assertForbidden();
         $this->assertNotSoftDeleted($categoria);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('categorias.destroy', $categoria))
             ->assertRedirect(route('categorias.index'))
             ->assertSessionHas('success');
@@ -301,7 +308,7 @@ class CategoriasWebTest extends TestCase
         TipoPieza::factory()->create(['id_categoria' => $conTipos->categoria_id]);
         $conMovimientos = $this->categoriaCoherente();
         Movimiento::factory()->create(['id_categoria' => $conMovimientos->categoria_id]);
-        $administrador = $this->usuarioConRol('administrador');
+        $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
 
         foreach ([$conTipos, $conMovimientos] as $categoria) {
             $this->actingAs($administrador)

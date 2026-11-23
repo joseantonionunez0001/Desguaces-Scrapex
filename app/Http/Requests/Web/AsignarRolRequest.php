@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Web;
 
-use Database\Seeders\RoleSeeder;
+use App\Support\Acceso;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +19,7 @@ class AsignarRolRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rol' => ['required', 'string', Rule::in(RoleSeeder::ROLES)],
+            'rol' => ['required', 'string', Rule::in(Acceso::rolesConcedibles($this->user()))],
         ];
     }
 
@@ -30,7 +30,7 @@ class AsignarRolRequest extends FormRequest
     {
         return [
             'rol.required' => 'Selecciona el rol que quieres asignar.',
-            'rol.in' => 'El rol seleccionado no es válido.',
+            'rol.in' => 'Solo puedes asignar los roles de gerente u operario.',
         ];
     }
 }

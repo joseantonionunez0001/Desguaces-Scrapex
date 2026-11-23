@@ -3,12 +3,20 @@
 namespace App\Http\Requests\Web;
 
 use App\Http\Requests\Web\Concerns\MensajesDeValidacion;
+use App\Models\Desguace;
+use App\Models\Estanteria;
+use App\Models\Fila;
+use App\Models\Modulo;
+use App\Models\Pasillo;
+use App\Models\Patio;
+use App\Models\Posicion;
+use App\Models\Sector;
+use App\Rules\ExisteEnMiSede;
 use App\Services\AlmacenJerarquia;
 use App\Services\EstructuraAlmacen;
 use App\Services\OcupacionAlmacen;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Arr;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
@@ -22,6 +30,20 @@ use Illuminate\Validation\Validator;
 class GuardarElementoAlmacenRequest extends FormRequest
 {
     use MensajesDeValidacion;
+
+    /**
+     * Modelo de cada tabla padre, para validar que pertenece a la sede del usuario.
+     */
+    private const MODELOS_PADRE = [
+        'desguaces' => Desguace::class,
+        'modulos' => Modulo::class,
+        'pasillos' => Pasillo::class,
+        'estanterias' => Estanteria::class,
+        'patios' => Patio::class,
+        'sectores' => Sector::class,
+        'filas' => Fila::class,
+        'posiciones' => Posicion::class,
+    ];
 
     /**
      * La autorización real la hace el middleware de permisos de cada ruta.
@@ -42,7 +64,8 @@ class GuardarElementoAlmacenRequest extends FormRequest
             $definicion['columna_padre'] => [
                 'required',
                 'integer',
-                Rule::exists($definicion['tabla_padre'], $definicion['pk_padre'])->whereNull('deleted_at'),
+                // El padre debe existir y pertenecer al desguace autorizado.
+                new ExisteEnMiSede(self::MODELOS_PADRE[$definicion['tabla_padre']]),
             ],
             'ruta' => ['required', 'array'],
             'ruta.*' => ['nullable', 'integer'],

@@ -3,8 +3,9 @@
 namespace App\Http\Requests\Web;
 
 use App\Http\Requests\Web\Concerns\MensajesDeValidacion;
+use App\Models\Nivel;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Asignación de ubicación de un vehículo. Reproduce las reglas de UbicacionVehiculoApiController
@@ -28,7 +29,7 @@ class AsignarUbicacionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id_nivel' => ['required', Rule::exists('niveles', 'id_nivel')->whereNull('deleted_at')],
+            'id_nivel' => ['required', new ExisteEnMiSede(Nivel::class)],
             'fecha_inicio' => ['required', 'date'],
             'fecha_fin' => ['nullable', 'date', 'after_or_equal:fecha_inicio'],
             'patio' => ['nullable', 'integer'],

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Estanteria;
+use App\Models\Pasillo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class EstanteriaApiController extends Controller
@@ -15,7 +17,7 @@ class EstanteriaApiController extends Controller
 
         return response()->json([
             'data' => $estanterias,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class EstanteriaApiController extends Controller
 
         return response()->json([
             'data' => $estanteria,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,18 +36,18 @@ class EstanteriaApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_pasillo' => 'required|exists:pasillos,id_pasillo',
+            'id_pasillo' => ['required', new ExisteEnMiSede(Pasillo::class)],
             'numero_estanteria' => 'required|string|max:50',
         ]);
 
-        $estanteria = new Estanteria();
+        $estanteria = new Estanteria;
         $estanteria->id_pasillo = $datos['id_pasillo'];
         $estanteria->numero_estanteria = $datos['numero_estanteria'];
         $estanteria->save();
 
         return response()->json([
             'data' => $estanteria,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class EstanteriaApiController extends Controller
         $estanteria = Estanteria::findOrFail($id);
 
         $datos = $request->validate([
-            'id_pasillo' => 'required|exists:pasillos,id_pasillo',
+            'id_pasillo' => ['required', new ExisteEnMiSede(Pasillo::class)],
             'numero_estanteria' => 'required|string|max:50',
         ]);
 
@@ -65,7 +67,7 @@ class EstanteriaApiController extends Controller
 
         return response()->json([
             'data' => $estanteria,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -77,7 +79,7 @@ class EstanteriaApiController extends Controller
 
         return response()->json([
             'data' => 'Estanteria eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

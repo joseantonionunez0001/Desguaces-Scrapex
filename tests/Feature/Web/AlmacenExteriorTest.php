@@ -10,6 +10,7 @@ use App\Models\Posicion;
 use App\Models\Sector;
 use App\Models\UbicacionVehiculo;
 use App\Models\Vehiculo;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -87,21 +88,32 @@ class AlmacenExteriorTest extends TestCase
     {
         Desguace::factory()->create(['nombre' => 'Desguace Levante']);
 
-        foreach (['administrador', 'gerente', 'operario'] as $rol) {
+        foreach ([RoleSeeder::ADMIN_DESGUACE, 'gerente'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get($this->urlIndice())
                 ->assertOk()
                 ->assertSee('Almacén exterior')
                 ->assertSee('Desguace Levante');
         }
+
+        // El almacén es un módulo de gestión: el operario no entra.
+        $this->actingAs($this->usuarioConRol('operario'))->get($this->urlIndice())->assertForbidden();
     }
 
-    public function test_sin_desguaces_muestra_el_estado_vacio(): void
+    public function test_solo_se_ofrece_el_desguace_propio(): void
     {
-        $this->actingAs($this->usuarioConRol('operario'))
+        Desguace::factory()->create(['nombre' => 'Desguace Propio']);
+        $ajeno = Desguace::factory()->create(['nombre' => 'Desguace Ajeno']);
+
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlIndice())
             ->assertOk()
-            ->assertSee('No hay desguaces');
+            ->assertSee('Desguace Propio')
+            ->assertDontSee('Desguace Ajeno');
+
+        $this->actingAs($this->usuarioConRol('gerente'))
+            ->get($this->urlIndice(['desguace' => $ajeno->id_desguace]))
+            ->assertNotFound();
     }
 
     // ---------- Navegación ----------
@@ -109,7 +121,7 @@ class AlmacenExteriorTest extends TestCase
     public function test_se_navega_por_patios_sectores_filas_y_posiciones(): void
     {
         $e = $this->crearPosicion();
-        $usuario = $this->usuarioConRol('operario');
+        $usuario = $this->usuarioConRol('gerente');
 
         $this->actingAs($usuario)->get($this->urlIndice(['desguace' => $e['desguace']->id_desguace]))
             ->assertOk()->assertSee('Patio Principal')->assertSee('PAT-01');
@@ -131,7 +143,7 @@ class AlmacenExteriorTest extends TestCase
     {
         $e = $this->crearPosicion();
         $sectorAjeno = Sector::factory()->create();
-        $usuario = $this->usuarioConRol('administrador');
+        $usuario = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
 
         $this->actingAs($usuario)->get($this->urlIndice(['desguace' => $e['desguace']->id_desguace, 'patio' => 99999]))->assertNotFound();
         $this->actingAs($usuario)->get($this->urlIndice([
@@ -155,7 +167,7 @@ class AlmacenExteriorTest extends TestCase
         $eliminada = $this->ubicar($niveles[3]);          // eliminada lógicamente: no cuenta
         $eliminada->delete();
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlDePosicion($e))
             ->assertOk()
             ->assertSee('2 / 4', false);
@@ -165,7 +177,7 @@ class AlmacenExteriorTest extends TestCase
     {
         $e = $this->crearPosicion(capacidad: 2);
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlDePosicion($e))
             ->assertSee('0 / 2', false);
     }
@@ -180,7 +192,7 @@ class AlmacenExteriorTest extends TestCase
         $this->ubicar($nivelOcupado, vehiculo: $vehiculo);
         $this->ubicar($nivelCerrado, fin: '2026-03-01');
 
-        $respuesta = $this->actingAs($this->usuarioConRol('operario'))
+        $respuesta = $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlDeNiveles($e))
             ->assertOk()
             ->assertSee('Niveles de la posición')
@@ -349,7 +361,7 @@ class AlmacenExteriorTest extends TestCase
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
             ->assertForbidden();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
             ->assertRedirect($this->urlDeNiveles($e))
             ->assertSessionHas('success');
@@ -363,7 +375,7 @@ class AlmacenExteriorTest extends TestCase
         $nivel = Nivel::factory()->create(['id_posicion' => $e['posicion']->id_posicion]);
         $this->ubicar($nivel);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
             ->assertSessionHas('error');
 
@@ -376,7 +388,7 @@ class AlmacenExteriorTest extends TestCase
         $nivel = Nivel::factory()->create(['id_posicion' => $e['posicion']->id_posicion]);
         $historica = $this->ubicar($nivel, fin: '2026-02-01');
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.exterior.niveles.destroy', $nivel->id_nivel))
             ->assertSessionHas('success');
 
@@ -388,7 +400,7 @@ class AlmacenExteriorTest extends TestCase
     {
         $e = $this->crearPosicion();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.exterior.patios.destroy', $e['patio']->id_patio))
             ->assertSessionHas('error');
 

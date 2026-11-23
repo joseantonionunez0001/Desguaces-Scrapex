@@ -13,6 +13,15 @@
         ]">
         <x-slot:actions>
             <x-ui.button :href="route('admin.usuarios.index')" variant="outline" icon="arrow-left">Volver al listado</x-ui.button>
+            @if ($puedeEditar)
+                <x-ui.button :href="route('admin.usuarios.edit', $usuario)" variant="outline" icon="pencil">Editar cuenta</x-ui.button>
+            @endif
+            @if ($puedeEliminar)
+                <x-ui.delete-button
+                    :action="route('admin.usuarios.destroy', $usuario)"
+                    message="¿Seguro que quieres eliminar la cuenta de {{ $usuario->name }}?"
+                    label="Eliminar la cuenta de {{ $usuario->name }}" />
+            @endif
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -65,7 +74,10 @@
                     otro administrador debe hacerlo.
                 </x-ui.alert>
             @elseif (! $puedeAsignar)
-                <x-ui.alert type="info">No tienes permiso para asignar roles.</x-ui.alert>
+                <x-ui.alert type="info">
+                    No puedes cambiar el rol de esta cuenta. Los administradores de desguace solo gestionan
+                    gerentes y operarios de su sede; los administradores se designan desde Desguaces.
+                </x-ui.alert>
             @else
                 <form method="POST" action="{{ route('admin.usuarios.rol.update', $usuario) }}" class="space-y-4">
                     @csrf
@@ -91,5 +103,17 @@
                 @endif
             @endif
         </x-ui.card>
+
+        @if ($puedeCambiarSede)
+            <x-ui.card title="Desguace asignado" subtitle="Procedimiento autorizado para cambiar la sede de la cuenta.">
+                <form method="POST" action="{{ route('admin.usuarios.desguace.update', $usuario) }}" class="space-y-4"
+                    data-confirm="¿Cambiar el desguace de {{ $usuario->name }}? Perderá el acceso a su sede actual y tendrá que volver a iniciar sesión.">
+                    @csrf
+                    @method('PUT')
+                    <x-form.select name="id_desguace" label="Desguace" :options="$desguaces" :value="$usuario->id_desguace" placeholder="Selecciona un desguace" :required="true" />
+                    <x-form.actions submit="Cambiar desguace" class="mt-2" />
+                </form>
+            </x-ui.card>
+        @endif
     </div>
 @endsection

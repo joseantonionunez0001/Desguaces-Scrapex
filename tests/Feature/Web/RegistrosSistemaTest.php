@@ -4,6 +4,7 @@ namespace Tests\Feature\Web;
 
 use App\Models\RegistroSistema;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -18,7 +19,7 @@ class RegistrosSistemaTest extends TestCase
     {
         parent::setUp();
         $this->prepararRoles();
-        $this->administrador = $this->usuarioConRol('administrador');
+        $this->administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
     }
 
     private function url(array $consulta = []): string
@@ -33,7 +34,12 @@ class RegistrosSistemaTest extends TestCase
 
     private function usuario(string $nombre, string $correo): User
     {
-        return User::factory()->create(['name' => $nombre, 'email' => $correo]);
+        // Personal de la misma sede que el administrador: solo ve los registros de su sede.
+        return User::factory()->create([
+            'name' => $nombre,
+            'email' => $correo,
+            'id_desguace' => $this->administrador->id_desguace,
+        ]);
     }
 
     // ---------- Acceso ----------

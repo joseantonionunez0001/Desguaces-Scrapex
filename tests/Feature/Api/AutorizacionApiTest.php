@@ -5,7 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Desguace;
 use App\Models\RegistroSistema;
 use App\Models\User;
-use App\Models\Vehiculo;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\PreparaAutorizacion;
@@ -13,26 +13,13 @@ use Tests\TestCase;
 
 class AutorizacionApiTest extends TestCase
 {
-    use RefreshDatabase, PreparaAutorizacion;
+    use PreparaAutorizacion, RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->prepararRoles();
-    }
-
-    private function datosVehiculo(Desguace $desguace): array
-    {
-        return [
-            'id_desguace' => $desguace->id_desguace,
-            'matricula' => fake()->unique()->regexify('[0-9]{4}[BCDFGHJKLMNPRSTVWXYZ]{3}'),
-            'marca' => 'SEAT',
-            'modelo' => 'Ibiza',
-            'fecha_llegada' => '2026-01-15',
-            'numero_bastidor' => fake()->unique()->regexify('[A-HJ-NPR-Z0-9]{17}'),
-            'estado_tratamiento' => 'Pendiente',
-        ];
     }
 
     // ---------- Autenticación ----------
@@ -98,7 +85,7 @@ class AutorizacionApiTest extends TestCase
         $this->withToken($token)->getJson('/api/user')->assertStatus(401);
     }
 
-    // ---------- Autorización por rol ----------
+    // ---------- Autorizacion por rol y desguace ----------
 
     public function test_usuario_sin_rol_no_puede_usar_los_crud(): void
     {
@@ -108,131 +95,195 @@ class AutorizacionApiTest extends TestCase
         $this->postJson('/api/piezas', [])->assertStatus(403);
     }
 
+    public function test_rol_de_desguace_sin_sede_queda_bloqueado_con_aviso(): void
+    {
+        foreach ([RoleSeeder::ADMIN_DESGUACE, RoleSeeder::GERENTE, RoleSeeder::OPERARIO] as $rol) {
+            Sanctum::actingAs($this->usuarioSinSede($rol), ['*']);
+
+            $this->getJson('/api/vehiculos')
+                ->assertStatus(403)
+                ->assertJsonPath('data', 'Tu cuenta no tiene un desguace asignado. Contacta con administración.');
+            $this->getJson('/api/usuarios')->assertStatus(403);
+        }
+    }
+
+    public function test_una_sede_eliminada_bloquea_a_su_personal(): void
+    {
+        $sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::GERENTE, $sede);
+        $sede->delete();
+
+        $this->getJson('/api/vehiculos')->assertStatus(403);
+    }
+
     public function test_operario_puede_consultar_pero_no_crear_ni_borrar(): void
     {
-        $this->actuarComo('operario');
-        $desguace = Desguace::factory()->create();
-        $vehiculo = Vehiculo::factory()->create();
+        $sede = $this->crearSede();
+        $vehiculo = $this->inventarioDe($sede)['vehiculo'];
+        $this->actuarComo(RoleSeeder::OPERARIO, $sede);
 
         $this->getJson('/api/vehiculos')->assertOk();
         $this->getJson("/api/vehiculos/{$vehiculo->id_vehiculo}")->assertOk();
-
-        $this->postJson('/api/vehiculos', $this->datosVehiculo($desguace))->assertStatus(403);
+        $this->postJson('/api/vehiculos', $this->datosVehiculo($sede))->assertStatus(403);
         $this->deleteJson("/api/vehiculos/{$vehiculo->id_vehiculo}")->assertStatus(403);
-        $this->putJson("/api/vehiculos/{$vehiculo->id_vehiculo}", $this->datosVehiculo($desguace))->assertStatus(403);
+        $this->putJson("/api/vehiculos/{$vehiculo->id_vehiculo}", $this->datosVehiculo($sede))->assertStatus(403);
     }
 
-    public function test_operario_puede_registrar_movimientos(): void
+    public function test_operario_no_puede_registrar_movimientos_ni_tocar_piezas_o_stock(): void
     {
-        $this->actuarComo('operario');
+        $sede = $this->crearSede();
+        $inventario = $this->inventarioDe($sede);
+        $this->actuarComo(RoleSeeder::OPERARIO, $sede);
 
-        // Llega al controlador (pasa la autorización) y falla solo por validación.
-        $this->postJson('/api/movimientos', [])->assertStatus(422);
-    }
-
-    public function test_operario_no_puede_eliminar_piezas(): void
-    {
-        $this->actuarComo('operario');
-
+        $this->postJson('/api/movimientos', [])->assertStatus(403);
         $this->postJson('/api/piezas', [])->assertStatus(403);
+        $this->putJson("/api/piezas/{$inventario['pieza']->id_pieza}", ['stock' => 99])->assertStatus(403);
+        $this->deleteJson("/api/piezas/{$inventario['pieza']->id_pieza}")->assertStatus(403);
+        $this->assertSame(5, $inventario['pieza']->fresh()->stock);
+    }
+
+    public function test_operario_no_accede_a_modulos_de_gestion(): void
+    {
+        $sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::OPERARIO, $sede);
+
+        foreach (['modulos', 'patios', 'pasillos', 'sectores', 'movimientos', 'usuarios', 'registro-sistema'] as $ruta) {
+            $this->getJson("/api/{$ruta}")->assertStatus(403);
+        }
     }
 
     public function test_gerente_puede_crear_y_editar_vehiculos_pero_no_eliminarlos(): void
     {
-        $this->actuarComo('gerente');
-        $desguace = Desguace::factory()->create();
-        $vehiculo = Vehiculo::factory()->create();
+        $sede = $this->crearSede();
+        $vehiculo = $this->inventarioDe($sede)['vehiculo'];
+        $this->actuarComo(RoleSeeder::GERENTE, $sede);
 
-        $this->postJson('/api/vehiculos', $this->datosVehiculo($desguace))->assertStatus(201);
-        $this->putJson("/api/vehiculos/{$vehiculo->id_vehiculo}", $this->datosVehiculo($desguace))->assertOk();
+        $this->postJson('/api/vehiculos', $this->datosVehiculo($sede))->assertStatus(201);
+        $this->putJson("/api/vehiculos/{$vehiculo->id_vehiculo}", $this->datosVehiculo($sede))->assertOk();
         $this->deleteJson("/api/vehiculos/{$vehiculo->id_vehiculo}")->assertStatus(403);
+    }
+
+    public function test_gerente_gestiona_piezas_y_stock_de_su_sede(): void
+    {
+        $sede = $this->crearSede();
+        $inventario = $this->inventarioDe($sede);
+        $gerente = $this->actuarComo(RoleSeeder::GERENTE, $sede);
+        $pieza = $inventario['pieza'];
+
+        $this->putJson("/api/piezas/{$pieza->id_pieza}", [
+            'nombre' => 'Alternador',
+            'precio' => 50,
+            'estado' => 'Usada',
+            'stock' => 12,
+            'stock_minimo' => 2,
+            'id_usuario' => $gerente->id,
+            'id_tipo_pieza' => $inventario['tipo']->id_pieza,
+        ])->assertOk();
+
+        $this->assertSame(12, $pieza->fresh()->stock);
     }
 
     public function test_gerente_no_puede_gestionar_usuarios_ni_auditoria(): void
     {
-        $this->actuarComo('gerente');
-        $objetivo = User::factory()->create();
+        $sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::GERENTE, $sede);
+        $objetivo = $this->usuarioConRol(RoleSeeder::OPERARIO, $sede);
 
         $this->getJson('/api/usuarios')->assertStatus(403);
-        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'operario'])->assertStatus(403);
+        $this->postJson('/api/usuarios', [])->assertStatus(403);
+        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'gerente'])->assertStatus(403);
         $this->getJson('/api/registro-sistema')->assertStatus(403);
     }
 
-    public function test_administrador_puede_eliminar_vehiculos(): void
+    public function test_administrador_de_desguace_puede_eliminar_vehiculos_de_su_sede(): void
     {
-        $this->actuarComo('administrador');
-        $vehiculo = Vehiculo::factory()->create();
+        $sede = $this->crearSede();
+        $vehiculo = $this->inventarioDe($sede)['vehiculo'];
+        $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $sede);
 
         $this->deleteJson("/api/vehiculos/{$vehiculo->id_vehiculo}")->assertOk();
     }
 
-    // ---------- Gestión de roles ----------
-
-    public function test_administrador_asigna_y_cambia_roles(): void
+    public function test_administrador_de_plataforma_no_accede_al_inventario(): void
     {
-        $this->actuarComo('administrador');
-        $objetivo = User::factory()->create();
+        $sede = $this->crearSede();
+        $vehiculo = $this->inventarioDe($sede)['vehiculo'];
+        $this->actuarComo(RoleSeeder::PLATAFORMA);
 
-        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'operario'])
-            ->assertOk();
+        $this->getJson('/api/vehiculos')->assertStatus(403);
+        $this->getJson("/api/vehiculos/{$vehiculo->id_vehiculo}")->assertStatus(403);
+        $this->getJson('/api/piezas')->assertStatus(403);
+        $this->postJson('/api/vehiculos', $this->datosVehiculo($sede))->assertStatus(403);
+    }
+
+    public function test_el_rol_anterior_administrador_no_conserva_permisos_ni_sede(): void
+    {
+        $sede = $this->crearSede();
+        $this->inventarioDe($sede);
+        $this->actuarComo(RoleSeeder::ADMINISTRADOR);
+
+        $this->getJson('/api/vehiculos')->assertStatus(403);
+        $this->getJson('/api/usuarios')->assertStatus(403);
+        $this->getJson('/api/desguaces')->assertStatus(403);
+    }
+
+    // ---------- Gestion de roles (administrador de desguace) ----------
+
+    public function test_administrador_de_desguace_asigna_y_cambia_roles_en_su_equipo(): void
+    {
+        $sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $sede);
+        $objetivo = User::factory()->create(['id_desguace' => $sede->id_desguace]);
+
+        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'operario'])->assertOk();
         $this->assertTrue($objetivo->fresh()->hasRole('operario'));
 
         // Cambiar el rol sustituye al anterior.
-        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'gerente'])
-            ->assertOk();
+        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'gerente'])->assertOk();
         $objetivo->refresh();
         $this->assertTrue($objetivo->hasRole('gerente'));
         $this->assertFalse($objetivo->hasRole('operario'));
     }
 
-    public function test_administrador_retira_un_rol(): void
+    public function test_administrador_de_desguace_retira_un_rol(): void
     {
-        $this->actuarComo('administrador');
-        $objetivo = $this->usuarioConRol('operario');
+        $sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $sede);
+        $objetivo = $this->usuarioConRol('operario', $sede);
 
         $this->deleteJson("/api/usuarios/{$objetivo->id}/roles/operario")->assertOk();
+
         $this->assertFalse($objetivo->fresh()->hasRole('operario'));
     }
 
-    public function test_rol_no_valido_se_rechaza(): void
+    public function test_no_se_pueden_conceder_roles_de_administracion(): void
     {
-        $this->actuarComo('administrador');
-        $objetivo = User::factory()->create();
+        $sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $sede);
+        $objetivo = User::factory()->create(['id_desguace' => $sede->id_desguace]);
 
-        $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => 'superusuario'])
-            ->assertStatus(422);
+        foreach ([RoleSeeder::ADMIN_DESGUACE, RoleSeeder::PLATAFORMA, RoleSeeder::ADMINISTRADOR, 'superusuario'] as $rol) {
+            $this->putJson("/api/usuarios/{$objetivo->id}/rol", ['rol' => $rol])->assertStatus(422);
+        }
+
+        $this->assertCount(0, $objetivo->fresh()->getRoleNames());
     }
 
     public function test_nadie_puede_modificar_sus_propios_roles(): void
     {
-        $admin = $this->actuarComo('administrador');
+        $sede = $this->crearSede();
+        $admin = $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $sede);
 
-        $this->putJson("/api/usuarios/{$admin->id}/rol", ['rol' => 'operario'])
-            ->assertStatus(403);
-        $this->deleteJson("/api/usuarios/{$admin->id}/roles/administrador")
-            ->assertStatus(403);
+        $this->putJson("/api/usuarios/{$admin->id}/rol", ['rol' => 'operario'])->assertStatus(403);
+        $this->deleteJson("/api/usuarios/{$admin->id}/roles/operario")->assertStatus(403);
 
-        $this->assertTrue($admin->fresh()->hasRole('administrador'));
-    }
-
-    public function test_no_se_puede_retirar_el_ultimo_administrador(): void
-    {
-        // Único administrador del sistema.
-        $ultimoAdmin = $this->usuarioConRol('administrador');
-
-        // Gestor con permiso de asignar roles (no es admin) que intenta retirar al último admin.
-        $gestor = $this->usuarioConRol('operario');
-        $gestor->givePermissionTo('usuarios.asignar_roles');
-        Sanctum::actingAs($gestor, ['*']);
-
-        $this->deleteJson("/api/usuarios/{$ultimoAdmin->id}/roles/administrador")
-            ->assertStatus(422);
-        $this->assertTrue($ultimoAdmin->fresh()->hasRole('administrador'));
+        $this->assertTrue($admin->fresh()->hasRole(RoleSeeder::ADMIN_DESGUACE));
     }
 
     public function test_el_registro_de_auditoria_usa_el_usuario_autenticado(): void
     {
-        $operador = $this->actuarComo('administrador');
+        $sede = $this->crearSede();
+        $operador = $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $sede);
 
         $this->postJson('/api/registro-sistema', [
             'fecha_hora' => '2026-03-01 10:00:00',

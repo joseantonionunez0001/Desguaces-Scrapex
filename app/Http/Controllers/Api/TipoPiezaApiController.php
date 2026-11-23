@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Categoria;
 use App\Models\TipoPieza;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class TipoPiezaApiController extends Controller
@@ -15,7 +17,7 @@ class TipoPiezaApiController extends Controller
 
         return response()->json([
             'data' => $tiposPieza,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class TipoPiezaApiController extends Controller
 
         return response()->json([
             'data' => $tipoPieza,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -37,10 +39,10 @@ class TipoPiezaApiController extends Controller
             'nombre' => 'required|string|max:255',
             'fabricante' => 'required|string|max:255',
             'categoria' => 'required|string|max:255',
-            'id_categoria' => 'required|exists:categorias,categoria_id',
+            'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ]);
 
-        $tipoPieza = new TipoPieza();
+        $tipoPieza = new TipoPieza;
         $tipoPieza->nombre = $datos['nombre'];
         $tipoPieza->fabricante = $datos['fabricante'];
         $tipoPieza->categoria = $datos['categoria'];
@@ -49,7 +51,7 @@ class TipoPiezaApiController extends Controller
 
         return response()->json([
             'data' => $tipoPieza,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -62,7 +64,7 @@ class TipoPiezaApiController extends Controller
             'nombre' => 'required|string|max:255',
             'fabricante' => 'required|string|max:255',
             'categoria' => 'required|string|max:255',
-            'id_categoria' => 'required|exists:categorias,categoria_id',
+            'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ]);
 
         $tipoPieza->nombre = $datos['nombre'];
@@ -73,7 +75,7 @@ class TipoPiezaApiController extends Controller
 
         return response()->json([
             'data' => $tipoPieza,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -85,7 +87,7 @@ class TipoPiezaApiController extends Controller
 
         return response()->json([
             'data' => 'TipoPieza eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

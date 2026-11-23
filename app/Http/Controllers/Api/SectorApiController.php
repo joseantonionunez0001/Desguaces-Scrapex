@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Patio;
 use App\Models\Sector;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class SectorApiController extends Controller
@@ -15,7 +17,7 @@ class SectorApiController extends Controller
 
         return response()->json([
             'data' => $sectores,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class SectorApiController extends Controller
 
         return response()->json([
             'data' => $sector,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,12 +36,12 @@ class SectorApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_patio' => 'required|exists:patios,id_patio',
+            'id_patio' => ['required', new ExisteEnMiSede(Patio::class)],
             'codigo' => 'required|string|max:50',
             'tipo_zona' => 'required|string|max:100',
         ]);
 
-        $sector = new Sector();
+        $sector = new Sector;
         $sector->id_patio = $datos['id_patio'];
         $sector->codigo = $datos['codigo'];
         $sector->tipo_zona = $datos['tipo_zona'];
@@ -47,7 +49,7 @@ class SectorApiController extends Controller
 
         return response()->json([
             'data' => $sector,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -57,7 +59,7 @@ class SectorApiController extends Controller
         $sector = Sector::findOrFail($id);
 
         $datos = $request->validate([
-            'id_patio' => 'required|exists:patios,id_patio',
+            'id_patio' => ['required', new ExisteEnMiSede(Patio::class)],
             'codigo' => 'required|string|max:50',
             'tipo_zona' => 'required|string|max:100',
         ]);
@@ -69,7 +71,7 @@ class SectorApiController extends Controller
 
         return response()->json([
             'data' => $sector,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -81,7 +83,7 @@ class SectorApiController extends Controller
 
         return response()->json([
             'data' => 'Sector eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

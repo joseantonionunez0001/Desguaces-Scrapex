@@ -39,9 +39,14 @@
                         <th scope="col">Dirección</th>
                         <th scope="col">Teléfono</th>
                         <th scope="col">Ubicación</th>
-                        <th scope="col" class="text-right">Vehículos</th>
-                        <th scope="col" class="text-right">Módulos</th>
-                        <th scope="col" class="text-right">Patios</th>
+                        @if ($mostrarInventario)
+                            <th scope="col" class="text-right">Vehículos</th>
+                            <th scope="col" class="text-right">Módulos</th>
+                            <th scope="col" class="text-right">Patios</th>
+                        @endif
+                        @if ($mostrarAdministrador)
+                            <th scope="col">Administrador</th>
+                        @endif
                         <th scope="col" class="text-right">Acciones</th>
                     </tr>
                 </x-slot:head>
@@ -51,13 +56,29 @@
                         <td>{{ $desguace->direccion }}</td>
                         <td class="whitespace-nowrap">{{ $desguace->numero_telefono }}</td>
                         <td>{{ $desguace->{'ubicación'} }}</td>
-                        <td class="text-right tabular-nums">{{ $desguace->vehiculos_count }}</td>
-                        <td class="text-right tabular-nums">{{ $desguace->modulos_count }}</td>
-                        <td class="text-right tabular-nums">{{ $desguace->patios_count }}</td>
+                        @if ($mostrarInventario)
+                            <td class="text-right tabular-nums">{{ $desguace->vehiculos_count }}</td>
+                            <td class="text-right tabular-nums">{{ $desguace->modulos_count }}</td>
+                            <td class="text-right tabular-nums">{{ $desguace->patios_count }}</td>
+                        @endif
+                        @if ($mostrarAdministrador)
+                            <td>
+                                @forelse ($administradores->get($desguace->id_desguace, collect()) as $administrador)
+                                    <span class="block font-medium text-slate-900">{{ $administrador->name }}</span>
+                                    <span class="block text-xs text-slate-500">{{ $administrador->email }}</span>
+                                @empty
+                                    <x-ui.badge tone="amber">Sin administrador</x-ui.badge>
+                                @endforelse
+                            </td>
+                        @endif
                         <td>
                             <div class="flex justify-end gap-2">
                                 <x-ui.button variant="outline" size="sm" icon="eye" data-modal-open="detalle-desguace-{{ $desguace->id_desguace }}"
                                     aria-label="Ver detalle del desguace {{ $desguace->nombre }}">Detalle</x-ui.button>
+                                @can('desguaces.asignar_administrador')
+                                    <x-ui.button variant="outline" size="sm" icon="users" data-modal-open="administrador-desguace-{{ $desguace->id_desguace }}"
+                                        aria-label="Asignar o sustituir al administrador del desguace {{ $desguace->nombre }}">Administrador</x-ui.button>
+                                @endcan
                                 @can('desguaces.editar')
                                     <x-ui.button variant="outline" size="sm" icon="pencil" data-modal-open="editar-desguace-{{ $desguace->id_desguace }}"
                                         aria-label="Editar el desguace {{ $desguace->nombre }}">Editar</x-ui.button>
@@ -79,7 +100,7 @@
     </x-ui.card>
 
     @foreach ($desguaces as $desguace)
-        @include('desguaces._detalle', ['desguace' => $desguace])
+        @include('desguaces._detalle', ['desguace' => $desguace, 'mostrarInventario' => $mostrarInventario, 'mostrarAdministrador' => $mostrarAdministrador, 'administradores' => $administradores])
     @endforeach
 
     @can('desguaces.crear')
@@ -100,6 +121,28 @@
                     'accion' => route('desguaces.update', $desguace),
                     'desguace' => $desguace,
                 ])
+            </x-ui.modal>
+        @endforeach
+    @endcan
+    @can('desguaces.asignar_administrador')
+        @foreach ($desguaces as $desguace)
+            @php($modalAdministrador = 'administrador-desguace-'.$desguace->id_desguace)
+            <x-ui.modal :id="$modalAdministrador" title="Administrador de {{ $desguace->nombre }}" :open="old('_modal') === $modalAdministrador">
+                <form method="POST" action="{{ route('desguaces.administrador.update', $desguace) }}" novalidate>
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="_modal" value="{{ $modalAdministrador }}">
+                    <p class="mb-4 text-sm text-slate-600">
+                        Indica el correo de una cuenta existente o los datos de una cuenta nueva. Si ya hay un
+                        administrador, se sustituye: pierde el rol y se cierran sus sesiones.
+                    </p>
+                    <div class="grid gap-4">
+                        <x-form.input name="email" type="email" label="Correo electrónico" :required="true" maxlength="255" :use-old="old('_modal') === $modalAdministrador" />
+                        <x-form.input name="name" label="Nombre (solo para una cuenta nueva)" maxlength="255" :use-old="old('_modal') === $modalAdministrador" />
+                        <x-form.input name="password" type="password" label="Contraseña (solo para una cuenta nueva)" autocomplete="new-password" :use-old="old('_modal') === $modalAdministrador" />
+                    </div>
+                    <x-form.actions :modal="true" submit="Asignar administrador" />
+                </form>
             </x-ui.modal>
         @endforeach
     @endcan

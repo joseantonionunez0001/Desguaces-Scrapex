@@ -6,7 +6,13 @@
     <x-ui.page-header
         title="Gestión de usuarios"
         subtitle="Cuentas registradas y rol asignado a cada una."
-        :breadcrumbs="[['label' => 'Inicio', 'url' => route('dashboard')], ['label' => 'Usuarios']]" />
+        :breadcrumbs="[['label' => 'Inicio', 'url' => route('dashboard')], ['label' => 'Usuarios']]">
+        @if ($puedeCrear)
+            <x-slot:actions>
+                <x-ui.button :href="route('admin.usuarios.create')" icon="plus">Nueva cuenta</x-ui.button>
+            </x-slot:actions>
+        @endif
+    </x-ui.page-header>
 
     <div class="mb-6 grid gap-4 sm:grid-cols-3">
         <x-ui.stat-card label="Usuarios registrados" :value="$totales['usuarios']" icon="users" tone="blue" />

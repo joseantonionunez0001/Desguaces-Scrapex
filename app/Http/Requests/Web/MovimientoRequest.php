@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Models\Categoria;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Alta de movimientos. Reproduce las reglas de MovimientoApiController::store.
@@ -26,7 +27,7 @@ class MovimientoRequest extends FormRequest
             'fecha' => ['required', 'date'],
             // El tope evita un error de base de datos con enteros mayores que el tipo INT de la columna.
             'cantidad' => ['required', 'integer', 'min:1', 'max:2147483647'],
-            'id_categoria' => ['required', Rule::exists('categorias', 'categoria_id')->whereNull('deleted_at')],
+            'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ];
     }
 

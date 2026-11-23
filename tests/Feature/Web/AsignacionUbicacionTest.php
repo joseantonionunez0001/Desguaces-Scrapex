@@ -10,6 +10,7 @@ use App\Models\Posicion;
 use App\Models\Sector;
 use App\Models\UbicacionVehiculo;
 use App\Models\Vehiculo;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\Support\PreparaAutorizacion;
@@ -123,7 +124,7 @@ class AsignacionUbicacionTest extends TestCase
 
     public function test_gerente_y_administrador_ven_la_pantalla_con_el_vehiculo(): void
     {
-        foreach (['gerente', 'administrador'] as $rol) {
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get($this->urlAsignar())
                 ->assertOk()
@@ -135,7 +136,7 @@ class AsignacionUbicacionTest extends TestCase
 
     public function test_un_vehiculo_inexistente_o_eliminado_devuelve_404(): void
     {
-        $administrador = $this->usuarioConRol('administrador');
+        $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
         $eliminado = Vehiculo::factory()->create();
         $eliminado->delete();
 
@@ -161,7 +162,11 @@ class AsignacionUbicacionTest extends TestCase
 
     public function test_la_cascada_ofrece_solo_los_patios_del_desguace_del_vehiculo(): void
     {
-        Patio::factory()->create(['codigo' => 'PAT-AJENO', 'nombre' => 'Patio ajeno']);
+        Patio::factory()->create([
+            'codigo' => 'PAT-AJENO',
+            'nombre' => 'Patio ajeno',
+            'id_desguace' => Desguace::factory()->create()->id_desguace,
+        ]);
 
         $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlAsignar())
@@ -231,7 +236,7 @@ class AsignacionUbicacionTest extends TestCase
 
     public function test_el_administrador_tambien_puede_asignar(): void
     {
-        $this->enviar('administrador', ['id_nivel' => $this->nivel()->id_nivel, 'fecha_inicio' => '2026-05-01'])
+        $this->enviar(RoleSeeder::ADMIN_DESGUACE, ['id_nivel' => $this->nivel()->id_nivel, 'fecha_inicio' => '2026-05-01'])
             ->assertSessionHasNoErrors();
 
         $this->assertDatabaseCount('ubicaciones_vehiculo', 1);
@@ -324,7 +329,8 @@ class AsignacionUbicacionTest extends TestCase
         $nivelAjeno = $this->nivel($posicionAjena);
 
         $this->enviar('gerente', ['id_nivel' => $nivelAjeno->id_nivel, 'fecha_inicio' => '2026-05-01'])
-            ->assertSessionHasErrors(['id_nivel' => 'El nivel elegido pertenece a un patio de otro desguace distinto al del vehículo.']);
+            // El nivel es de otra sede: se rechaza con el mismo mensaje que si no existiera.
+            ->assertSessionHasErrors(['id_nivel' => 'El valor seleccionado en nivel no existe o no pertenece a tu desguace.']);
 
         $this->assertDatabaseCount('ubicaciones_vehiculo', 0);
     }

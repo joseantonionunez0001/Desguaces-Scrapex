@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Nivel;
 use App\Models\UbicacionVehiculo;
+use App\Models\Vehiculo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class UbicacionVehiculoApiController extends Controller
@@ -15,7 +18,7 @@ class UbicacionVehiculoApiController extends Controller
 
         return response()->json([
             'data' => $ubicaciones,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +29,7 @@ class UbicacionVehiculoApiController extends Controller
 
         return response()->json([
             'data' => $ubicacion,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,13 +37,13 @@ class UbicacionVehiculoApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_vehiculo' => 'required|exists:vehiculos,id_vehiculo',
-            'id_nivel' => 'required|exists:niveles,id_nivel',
+            'id_vehiculo' => ['required', new ExisteEnMiSede(Vehiculo::class)],
+            'id_nivel' => ['required', new ExisteEnMiSede(Nivel::class)],
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
         ]);
 
-        $ubicacion = new UbicacionVehiculo();
+        $ubicacion = new UbicacionVehiculo;
         $ubicacion->id_vehiculo = $datos['id_vehiculo'];
         $ubicacion->id_nivel = $datos['id_nivel'];
         $ubicacion->fecha_inicio = $datos['fecha_inicio'];
@@ -49,7 +52,7 @@ class UbicacionVehiculoApiController extends Controller
 
         return response()->json([
             'data' => $ubicacion,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -59,8 +62,8 @@ class UbicacionVehiculoApiController extends Controller
         $ubicacion = UbicacionVehiculo::findOrFail($id);
 
         $datos = $request->validate([
-            'id_vehiculo' => 'required|exists:vehiculos,id_vehiculo',
-            'id_nivel' => 'required|exists:niveles,id_nivel',
+            'id_vehiculo' => ['required', new ExisteEnMiSede(Vehiculo::class)],
+            'id_nivel' => ['required', new ExisteEnMiSede(Nivel::class)],
             'fecha_inicio' => 'required|date',
             'fecha_fin' => 'nullable|date|after_or_equal:fecha_inicio',
         ]);
@@ -73,7 +76,7 @@ class UbicacionVehiculoApiController extends Controller
 
         return response()->json([
             'data' => $ubicacion,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -85,7 +88,7 @@ class UbicacionVehiculoApiController extends Controller
 
         return response()->json([
             'data' => 'Ubicacion de vehiculo eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

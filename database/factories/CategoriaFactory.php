@@ -2,12 +2,12 @@
 
 namespace Database\Factories;
 
-use App\Models\Desguace;
+use App\Models\Categoria;
 use App\Models\Modulo;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Categoria>
+ * @extends Factory<Categoria>
  */
 class CategoriaFactory extends Factory
 {
@@ -20,7 +20,7 @@ class CategoriaFactory extends Factory
     {
         return [
             'nombre' => fake()->randomElement(['Motor', 'Carrocería', 'Interior', 'Transmisión', 'Suspensión', 'Electrónica', 'Iluminación', 'Frenos']),
-            'id_desguace' => Desguace::factory(),
+            'id_desguace' => fn (): int => DesguaceFactory::idPorDefecto(),
             'id_modulo' => Modulo::factory(),
             'id_vehiculo' => null,
         ];

@@ -3,66 +3,83 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Desguace;
 use App\Models\User;
+use App\Services\AdministracionDesguaces;
+use App\Support\Acceso;
 use Database\Seeders\RoleSeeder;
+use DomainException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * Cuentas de usuario.
+ * - Administrador de plataforma: consulta cuentas y cambia la sede (no gestiona el equipo).
+ * - Administrador de desguace: crea y gestiona gerentes y operarios de SU sede. La sede se asigna
+ *   en el servidor, nunca se acepta desde el formulario.
+ */
 class UsuarioApiController extends Controller
 {
     // GET /api/usuarios
-    public function index()
+    public function index(Request $request)
     {
-        // El modelo User oculta password y remember_token, no se exponen aquí
-        $usuarios = User::with(['desguace', 'roles'])->get();
+        // El modelo User oculta password y remember_token, no se exponen aqui
+        $usuarios = $this->consulta($request)->with(['desguace', 'roles'])->get();
 
         return response()->json([
             'data' => $usuarios,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
     // GET /api/usuarios/1
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
-        $usuario = User::with(['desguace', 'roles'])->findOrFail($id);
+        $usuario = $this->consulta($request)->with(['desguace', 'roles'])->findOrFail($id);
 
         return response()->json([
             'data' => $usuario,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
-    // POST /api/usuarios
+    // POST /api/usuarios  Body: name, email, password, rol (gerente|operario)
     public function store(Request $request)
     {
-        // Los roles no se aceptan aquí: se asignan con asignarRol().
         $datos = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
             'password' => 'required|string|min:8',
-            'id_desguace' => 'nullable|exists:desguaces,id_desguace',
+            'rol' => ['required', 'string', Rule::in(RoleSeeder::ROLES_GESTIONABLES)],
+            // La sede no se elige: la fija el servidor segun el administrador autenticado.
+            'id_desguace' => 'prohibited',
         ]);
 
         // El cast 'hashed' del modelo se encarga de hashear la contraseña
-        $usuario = new User();
+        $usuario = new User;
         $usuario->name = $datos['name'];
         $usuario->email = $datos['email'];
         $usuario->password = $datos['password'];
-        $usuario->id_desguace = $datos['id_desguace'] ?? null;
+        $usuario->id_desguace = Acceso::desguaceId($request->user());
         $usuario->save();
+        $usuario->assignRole($datos['rol']);
 
         return response()->json([
-            'data' => $usuario,
-            'success' => 1
+            'data' => $usuario->load(['desguace', 'roles']),
+            'success' => 1,
         ], 201);
     }
 
     // PUT /api/usuarios/1
     public function update(Request $request, string $id)
     {
-        $usuario = User::findOrFail($id);
+        $usuario = $this->consulta($request)->findOrFail($id);
+
+        if ($respuesta = $this->rechazarSiNoGestionable($request, $usuario)) {
+            return $respuesta;
+        }
 
         $datos = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -74,7 +91,9 @@ class UsuarioApiController extends Controller
                 Rule::unique('users', 'email')->ignore($usuario->getKey(), $usuario->getKeyName()),
             ],
             'password' => 'sometimes|required|string|min:8',
-            'id_desguace' => 'sometimes|nullable|exists:desguaces,id_desguace',
+            'rol' => ['sometimes', 'required', 'string', Rule::in(RoleSeeder::ROLES_GESTIONABLES)],
+            // Cambiar de sede a un usuario solo lo puede hacer la plataforma.
+            'id_desguace' => 'prohibited',
         ]);
 
         if (array_key_exists('name', $datos)) {
@@ -86,31 +105,33 @@ class UsuarioApiController extends Controller
         if (array_key_exists('password', $datos)) {
             $usuario->password = $datos['password'];
         }
-        if (array_key_exists('id_desguace', $datos)) {
-            $usuario->id_desguace = $datos['id_desguace'];
-        }
         $usuario->save();
 
+        if (array_key_exists('rol', $datos)) {
+            $usuario->syncRoles([$datos['rol']]);
+        }
+
         return response()->json([
-            'data' => $usuario,
-            'success' => 1
+            'data' => $usuario->load(['desguace', 'roles']),
+            'success' => 1,
         ], 200);
     }
 
     // DELETE /api/usuarios/1 (borrado lógico)
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $usuario = User::findOrFail($id);
+        $usuario = $this->consulta($request)->findOrFail($id);
 
-        if ($usuario->is($request->user())) {
-            return $this->prohibido('No puedes eliminar tu propia cuenta.');
+        if ($respuesta = $this->rechazarSiNoGestionable($request, $usuario)) {
+            return $respuesta;
         }
 
+        $usuario->tokens()->delete();
         $usuario->delete();
 
         return response()->json([
             'data' => 'Usuario eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -118,13 +139,13 @@ class UsuarioApiController extends Controller
     public function asignarRol(Request $request, string $id): JsonResponse
     {
         $datos = $request->validate([
-            'rol' => ['required', 'string', Rule::in(RoleSeeder::ROLES)],
+            'rol' => ['required', 'string', Rule::in(RoleSeeder::ROLES_GESTIONABLES)],
         ]);
 
-        $usuario = User::findOrFail($id);
+        $usuario = $this->consulta($request)->findOrFail($id);
 
-        if ($usuario->is($request->user())) {
-            return $this->prohibido('No puedes modificar tus propios roles.');
+        if ($respuesta = $this->rechazarSiNoGestionable($request, $usuario)) {
+            return $respuesta;
         }
 
         // syncRoles deja al usuario con exactamente ese rol.
@@ -132,49 +153,93 @@ class UsuarioApiController extends Controller
 
         return response()->json([
             'data' => $usuario->load(['desguace', 'roles']),
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
     // DELETE /api/usuarios/1/roles/gerente  (retira un rol concreto)
     public function retirarRol(Request $request, string $id, string $rol): JsonResponse
     {
-        if (! in_array($rol, RoleSeeder::ROLES, true)) {
+        if (! in_array($rol, RoleSeeder::ROLES_GESTIONABLES, true)) {
             return response()->json([
                 'data' => 'Rol no válido',
-                'success' => 0
+                'success' => 0,
             ], 422);
         }
 
-        $usuario = User::findOrFail($id);
+        $usuario = $this->consulta($request)->findOrFail($id);
 
-        if ($usuario->is($request->user())) {
-            return $this->prohibido('No puedes modificar tus propios roles.');
-        }
-
-        // Evita dejar el sistema sin ningún administrador.
-        if ($rol === RoleSeeder::ADMINISTRADOR
-            && $usuario->hasRole($rol)
-            && User::role(RoleSeeder::ADMINISTRADOR)->count() <= 1) {
-            return response()->json([
-                'data' => 'No se puede retirar el último administrador',
-                'success' => 0
-            ], 422);
+        if ($respuesta = $this->rechazarSiNoGestionable($request, $usuario)) {
+            return $respuesta;
         }
 
         $usuario->removeRole($rol);
 
         return response()->json([
             'data' => $usuario->load(['desguace', 'roles']),
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
-    private function prohibido(string $mensaje): JsonResponse
+    // PUT /api/usuarios/1/desguace  Body: {"id_desguace": 2}
+    // Procedimiento autorizado para cambiar la sede de una cuenta (solo administrador de plataforma).
+    public function asignarDesguace(Request $request, string $id, AdministracionDesguaces $administracion): JsonResponse
     {
+        $datos = $request->validate([
+            'id_desguace' => ['required', 'integer', Rule::exists('desguaces', 'id_desguace')->whereNull('deleted_at')],
+        ]);
+
+        $usuario = User::findOrFail($id);
+        $desguace = Desguace::findOrFail($datos['id_desguace']);
+
+        try {
+            $usuario = $administracion->asignarDesguace($usuario, $desguace);
+        } catch (DomainException $e) {
+            return response()->json([
+                'data' => $e->getMessage(),
+                'success' => 0,
+            ], 422);
+        }
+
         return response()->json([
-            'data' => $mensaje,
-            'success' => 0
-        ], 403);
+            'data' => $usuario->load(['desguace', 'roles']),
+            'success' => 1,
+        ], 200);
+    }
+
+    // Cuentas visibles: la plataforma ve todas; un administrador de desguace, solo las de su sede.
+    private function consulta(Request $request): Builder
+    {
+        $actor = $request->user();
+
+        if ($actor->esAdministradorPlataforma()) {
+            return User::query();
+        }
+
+        // Sin sede valida el middleware ya habria bloqueado la peticion; esto es una red de seguridad.
+        $idDesguace = Acceso::desguaceId($actor);
+
+        return $idDesguace === null
+            ? User::query()->whereRaw('1 = 0')
+            : User::query()->delDesguace($idDesguace);
+    }
+
+    // Un administrador de desguace solo gestiona gerentes, operarios y cuentas sin rol de su sede.
+    private function rechazarSiNoGestionable(Request $request, User $objetivo): ?JsonResponse
+    {
+        $esAdministracion = $objetivo->hasAnyRole([
+            RoleSeeder::PLATAFORMA,
+            RoleSeeder::ADMIN_DESGUACE,
+            RoleSeeder::ADMINISTRADOR,
+        ]);
+
+        if ($objetivo->is($request->user()) || $esAdministracion) {
+            return response()->json([
+                'data' => 'No puedes gestionar esta cuenta.',
+                'success' => 0,
+            ], 403);
+        }
+
+        return null;
     }
 }

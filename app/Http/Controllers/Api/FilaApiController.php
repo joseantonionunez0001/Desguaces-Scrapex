@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Fila;
+use App\Models\Sector;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class FilaApiController extends Controller
@@ -15,7 +17,7 @@ class FilaApiController extends Controller
 
         return response()->json([
             'data' => $filas,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class FilaApiController extends Controller
 
         return response()->json([
             'data' => $fila,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,18 +36,18 @@ class FilaApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_sector' => 'required|exists:sectores,id_sector',
+            'id_sector' => ['required', new ExisteEnMiSede(Sector::class)],
             'numero_fila' => 'required|string|max:50',
         ]);
 
-        $fila = new Fila();
+        $fila = new Fila;
         $fila->id_sector = $datos['id_sector'];
         $fila->numero_fila = $datos['numero_fila'];
         $fila->save();
 
         return response()->json([
             'data' => $fila,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class FilaApiController extends Controller
         $fila = Fila::findOrFail($id);
 
         $datos = $request->validate([
-            'id_sector' => 'required|exists:sectores,id_sector',
+            'id_sector' => ['required', new ExisteEnMiSede(Sector::class)],
             'numero_fila' => 'required|string|max:50',
         ]);
 
@@ -65,7 +67,7 @@ class FilaApiController extends Controller
 
         return response()->json([
             'data' => $fila,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -77,7 +79,7 @@ class FilaApiController extends Controller
 
         return response()->json([
             'data' => 'Fila eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

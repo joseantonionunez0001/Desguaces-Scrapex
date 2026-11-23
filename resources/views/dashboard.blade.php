@@ -26,6 +26,12 @@
                         @endforelse
                     </dd>
                 </div>
+                @if ($desguace)
+                    <div>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Desguace</dt>
+                        <dd class="mt-0.5 font-medium text-slate-800">{{ $desguace->nombre }}</dd>
+                    </div>
+                @endif
             </dl>
 
             <form method="POST" action="{{ route('logout') }}">
@@ -42,6 +48,11 @@
                 Tu cuenta aún no tiene ningún rol. Un administrador debe asignártelo antes de que puedas
                 utilizar las funciones del desguace. Mientras tanto no tienes acceso a los módulos internos.
             </p>
+        </x-ui.alert>
+    @elseif ($sinDesguace)
+        <x-ui.alert type="warning">
+            <p class="font-semibold">Sin desguace asignado</p>
+            <p class="mt-1">{{ $avisoSinDesguace }} Hasta entonces no tienes acceso a los datos de ninguna sede.</p>
         </x-ui.alert>
     @else
         @if ($indicadores === [])

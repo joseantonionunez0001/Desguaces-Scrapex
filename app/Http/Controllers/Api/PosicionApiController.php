@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Fila;
 use App\Models\Posicion;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class PosicionApiController extends Controller
@@ -15,7 +17,7 @@ class PosicionApiController extends Controller
 
         return response()->json([
             'data' => $posiciones,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class PosicionApiController extends Controller
 
         return response()->json([
             'data' => $posicion,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,12 +36,12 @@ class PosicionApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_fila' => 'required|exists:filas,id_fila',
+            'id_fila' => ['required', new ExisteEnMiSede(Fila::class)],
             'numero_posicion' => 'required|string|max:50',
             'capacidad_maxima' => 'required|integer|min:1',
         ]);
 
-        $posicion = new Posicion();
+        $posicion = new Posicion;
         $posicion->id_fila = $datos['id_fila'];
         $posicion->numero_posicion = $datos['numero_posicion'];
         $posicion->capacidad_maxima = $datos['capacidad_maxima'];
@@ -47,7 +49,7 @@ class PosicionApiController extends Controller
 
         return response()->json([
             'data' => $posicion,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -57,7 +59,7 @@ class PosicionApiController extends Controller
         $posicion = Posicion::findOrFail($id);
 
         $datos = $request->validate([
-            'id_fila' => 'required|exists:filas,id_fila',
+            'id_fila' => ['required', new ExisteEnMiSede(Fila::class)],
             'numero_posicion' => 'required|string|max:50',
             'capacidad_maxima' => 'required|integer|min:1',
         ]);
@@ -69,7 +71,7 @@ class PosicionApiController extends Controller
 
         return response()->json([
             'data' => $posicion,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -81,7 +83,7 @@ class PosicionApiController extends Controller
 
         return response()->json([
             'data' => 'Posicion eliminada',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

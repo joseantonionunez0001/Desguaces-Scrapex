@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Models\Desguace;
 use App\Models\Vehiculo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,7 +32,7 @@ class GuardarVehiculoRequest extends FormRequest
         $vehiculo = $vehiculo instanceof Vehiculo ? $vehiculo : null;
 
         return [
-            'id_desguace' => ['required', Rule::exists('desguaces', 'id_desguace')->whereNull('deleted_at')],
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'matricula' => [
                 'required',
                 'string',

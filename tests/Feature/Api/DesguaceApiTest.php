@@ -3,11 +3,11 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Desguace;
-use App\Models\Nivel;
 use App\Models\UbicacionVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -18,21 +18,25 @@ use Tests\TestCase;
  */
 class DesguaceApiTest extends TestCase
 {
-    use RefreshDatabase, PreparaAutorizacion;
+    use PreparaAutorizacion, RefreshDatabase;
+
+    private Desguace $sede;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->prepararRoles();
-        $this->actuarComo('administrador');
+        $this->sede = $this->crearSede();
+        $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $this->sede);
     }
 
     public function test_el_seeder_crea_datos_relacionados(): void
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertDatabaseCount('desguaces', 2);
+        // 2 del seeder + la sede creada en setUp().
+        $this->assertDatabaseCount('desguaces', 3);
         $this->assertDatabaseCount('vehiculos', 8);
         // 8 vehículos x 2 ubicaciones (historial cerrado y abierto).
         $this->assertDatabaseCount('ubicaciones_vehiculo', 16);
@@ -40,7 +44,7 @@ class DesguaceApiTest extends TestCase
 
     public function test_crud_de_vehiculos(): void
     {
-        $desguace = Desguace::factory()->create();
+        $desguace = $this->sede;
 
         $crear = $this->postJson('/api/vehiculos', [
             'id_desguace' => $desguace->id_desguace,
@@ -101,8 +105,10 @@ class DesguaceApiTest extends TestCase
 
     public function test_el_historial_de_ubicaciones_del_vehiculo_es_consultable(): void
     {
-        $vehiculo = Vehiculo::factory()->create();
-        $nivel = Nivel::factory()->create();
+        $inventario = $this->inventarioDe($this->sede);
+        // Vehiculo sin ubicaciones previas para contar solo las de esta prueba.
+        $vehiculo = Vehiculo::factory()->create(['id_desguace' => $this->sede->id_desguace]);
+        $nivel = $inventario['nivel'];
 
         UbicacionVehiculo::factory()->create([
             'id_vehiculo' => $vehiculo->id_vehiculo,
@@ -122,9 +128,10 @@ class DesguaceApiTest extends TestCase
 
     public function test_una_misma_posicion_puede_reutilizarse(): void
     {
-        $vehiculo1 = Vehiculo::factory()->create();
-        $vehiculo2 = Vehiculo::factory()->create();
-        $nivel = Nivel::factory()->create();
+        $inventario = $this->inventarioDe($this->sede);
+        $vehiculo1 = $inventario['vehiculo'];
+        $vehiculo2 = Vehiculo::factory()->create(['id_desguace' => $this->sede->id_desguace]);
+        $nivel = $inventario['nivel'];
 
         UbicacionVehiculo::factory()->create([
             'id_vehiculo' => $vehiculo1->id_vehiculo,
@@ -142,6 +149,8 @@ class DesguaceApiTest extends TestCase
 
     public function test_el_campo_ubicacion_del_desguace_se_guarda_con_tilde(): void
     {
+        // Crear desguaces es tarea de la plataforma.
+        $this->actuarComo(RoleSeeder::PLATAFORMA);
         $this->postJson('/api/desguaces', [
             'nombre' => 'Desguace Central',
             'direccion' => 'Calle Mayor 1',

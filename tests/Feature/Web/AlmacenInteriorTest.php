@@ -8,6 +8,7 @@ use App\Models\Estanteria;
 use App\Models\Etiqueta;
 use App\Models\Modulo;
 use App\Models\Pasillo;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -44,7 +45,7 @@ class AlmacenInteriorTest extends TestCase
     {
         Desguace::factory()->create(['nombre' => 'Desguace Norte Real']);
 
-        foreach (['administrador', 'gerente', 'operario'] as $rol) {
+        foreach ([RoleSeeder::ADMIN_DESGUACE, 'gerente'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get($this->urlIndice())
                 ->assertOk()
@@ -52,14 +53,25 @@ class AlmacenInteriorTest extends TestCase
                 ->assertSee('Desguace Norte Real')
                 ->assertSee('Elige un desguace');
         }
+
+        // El almacén es un módulo de gestión: el operario no entra.
+        $this->actingAs($this->usuarioConRol('operario'))->get($this->urlIndice())->assertForbidden();
     }
 
-    public function test_sin_desguaces_muestra_el_estado_vacio(): void
+    public function test_solo_se_ofrece_el_desguace_propio(): void
     {
+        Desguace::factory()->create(['nombre' => 'Desguace Propio']);
+        $ajeno = Desguace::factory()->create(['nombre' => 'Desguace Ajeno']);
+
         $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlIndice())
             ->assertOk()
-            ->assertSee('No hay desguaces');
+            ->assertSee('Desguace Propio')
+            ->assertDontSee('Desguace Ajeno');
+
+        $this->actingAs($this->usuarioConRol('gerente'))
+            ->get($this->urlIndice(['desguace' => $ajeno->id_desguace]))
+            ->assertNotFound();
     }
 
     // ---------- Navegación ----------
@@ -69,9 +81,12 @@ class AlmacenInteriorTest extends TestCase
         $desguace = Desguace::factory()->create(['nombre' => 'Desguace Sur']);
         $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace, 'nombre_modulo' => 'Módulo Alfa']);
         Pasillo::factory()->count(2)->create(['id_modulo' => $modulo->id_modulo]);
-        Modulo::factory()->create(['nombre_modulo' => 'Módulo De Otro Desguace']);
+        Modulo::factory()->create([
+            'nombre_modulo' => 'Módulo De Otro Desguace',
+            'id_desguace' => Desguace::factory()->create()->id_desguace,
+        ]);
 
-        $respuesta = $this->actingAs($this->usuarioConRol('operario'))
+        $respuesta = $this->actingAs($this->usuarioConRol('gerente'))
             ->get($this->urlIndice(['desguace' => $desguace->id_desguace]))
             ->assertOk()
             ->assertSee('Módulos del desguace')
@@ -88,7 +103,7 @@ class AlmacenInteriorTest extends TestCase
         $pasillo = Pasillo::factory()->create(['id_modulo' => $modulo->id_modulo, 'numero_pasillo' => '7']);
         $estanteria = Estanteria::factory()->create(['id_pasillo' => $pasillo->id_pasillo, 'numero_estanteria' => '12']);
         Etiqueta::factory()->create(['id_estanteria' => $estanteria->id_estanteria, 'numero_etiqueta' => 'ET-0042']);
-        $usuario = $this->usuarioConRol('operario');
+        $usuario = $this->usuarioConRol('gerente');
 
         $this->actingAs($usuario)
             ->get($this->urlIndice(['desguace' => $desguace->id_desguace, 'modulo' => $modulo->id_modulo]))
@@ -125,17 +140,14 @@ class AlmacenInteriorTest extends TestCase
             ->assertSee('No hay módulos en este nivel')
             ->assertSee('Nuevo módulo');
 
-        $this->actingAs($this->usuarioConRol('operario'))->get($url)
-            ->assertOk()
-            ->assertSee('No hay módulos en este nivel')
-            ->assertDontSee('Nuevo módulo');
+        $this->actingAs($this->usuarioConRol('operario'))->get($url)->assertForbidden();
     }
 
     public function test_las_urls_con_un_camino_incorrecto_devuelven_404(): void
     {
         $desguace = Desguace::factory()->create();
-        $moduloAjeno = Modulo::factory()->create();
-        $usuario = $this->usuarioConRol('administrador');
+        $moduloAjeno = Modulo::factory()->create(['id_desguace' => Desguace::factory()->create()->id_desguace]);
+        $usuario = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
 
         // Desguace inexistente, módulo de otro desguace, módulo sin desguace y valores no numéricos.
         $this->actingAs($usuario)->get($this->urlIndice(['desguace' => 99999]))->assertNotFound();
@@ -242,7 +254,7 @@ class AlmacenInteriorTest extends TestCase
     {
         $desguace = Desguace::factory()->create();
         $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
-        $moduloAjeno = Modulo::factory()->create();
+        $moduloAjeno = Modulo::factory()->create(['id_desguace' => Desguace::factory()->create()->id_desguace]);
         $moduloEliminado = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
         $moduloEliminado->delete();
         $usuario = $this->usuarioConRol('gerente');
@@ -353,7 +365,7 @@ class AlmacenInteriorTest extends TestCase
             ->assertForbidden();
         $this->assertNotSoftDeleted('modulos', ['id_modulo' => $modulo->id_modulo]);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.interior.modulos.destroy', $modulo->id_modulo))
             ->assertRedirect($this->urlIndice(['desguace' => $desguace->id_desguace]))
             ->assertSessionHas('success');
@@ -365,7 +377,7 @@ class AlmacenInteriorTest extends TestCase
         $desguace = Desguace::factory()->create();
         $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
         Pasillo::factory()->create(['id_modulo' => $modulo->id_modulo]);
-        $administrador = $this->usuarioConRol('administrador');
+        $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
 
         $this->actingAs($administrador)
             ->delete(route('almacen.interior.modulos.destroy', $modulo->id_modulo))
@@ -380,7 +392,7 @@ class AlmacenInteriorTest extends TestCase
         $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
         Categoria::factory()->create(['id_desguace' => $desguace->id_desguace, 'id_modulo' => $modulo->id_modulo, 'id_vehiculo' => null]);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.interior.modulos.destroy', $modulo->id_modulo))
             ->assertSessionHas('error');
         $this->assertNotSoftDeleted('modulos', ['id_modulo' => $modulo->id_modulo]);
@@ -394,7 +406,7 @@ class AlmacenInteriorTest extends TestCase
         $estanteria = Estanteria::factory()->create(['id_pasillo' => $pasillo->id_pasillo]);
         $etiqueta = Etiqueta::factory()->create(['id_estanteria' => $estanteria->id_estanteria]);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('almacen.interior.etiquetas.destroy', $etiqueta->id_etiqueta))
             ->assertRedirect($this->urlIndice([
                 'desguace' => $desguace->id_desguace,
@@ -412,13 +424,12 @@ class AlmacenInteriorTest extends TestCase
         Modulo::factory()->create(['id_desguace' => $desguace->id_desguace, 'nombre_modulo' => 'Módulo Visible']);
         $url = $this->urlIndice(['desguace' => $desguace->id_desguace]);
 
-        $this->actingAs($this->usuarioConRol('administrador'))->get($url)
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get($url)
             ->assertSee('Nuevo módulo')->assertSee('Editar Módulo Visible')->assertSee('Eliminar Módulo Visible');
 
         $this->actingAs($this->usuarioConRol('gerente'))->get($url)
             ->assertSee('Nuevo módulo')->assertSee('Editar Módulo Visible')->assertDontSee('Eliminar Módulo Visible');
 
-        $this->actingAs($this->usuarioConRol('operario'))->get($url)
-            ->assertSee('Módulo Visible')->assertDontSee('Nuevo módulo')->assertDontSee('Editar Módulo Visible')->assertDontSee('Eliminar Módulo Visible');
+        $this->actingAs($this->usuarioConRol('operario'))->get($url)->assertForbidden();
     }
 }

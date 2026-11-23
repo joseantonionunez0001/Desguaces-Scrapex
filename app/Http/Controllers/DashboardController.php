@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Desguace;
 use App\Models\Movimiento;
 use App\Models\Pieza;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Support\Acceso;
 use App\Support\Navegacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -19,14 +21,21 @@ class DashboardController extends Controller
         $usuario = $request->user();
         $roles = $usuario->getRoleNames();
         $sinRol = $roles->isEmpty();
+        // Rol de desguace sin sede válida: acceso bloqueado y aviso para contactar con administración.
+        $sinDesguace = Acceso::sinDesguaceAsignado($usuario);
+        $bloqueado = $sinRol || $sinDesguace;
+        $idDesguace = Acceso::desguaceId($usuario);
 
         return view('dashboard', [
             'usuario' => $usuario,
             'roles' => $roles,
             'sinRol' => $sinRol,
-            // Un usuario sin rol no ve módulos ni indicadores internos.
-            'indicadores' => $sinRol ? [] : $this->indicadores($usuario),
-            'accesos' => $sinRol ? [] : $this->accesosRapidos($usuario),
+            'sinDesguace' => $sinDesguace,
+            'avisoSinDesguace' => Acceso::AVISO_SIN_DESGUACE,
+            'desguace' => $idDesguace !== null ? Desguace::query()->find($idDesguace) : null,
+            // Un usuario sin rol o sin sede no ve módulos ni indicadores internos.
+            'indicadores' => $bloqueado ? [] : $this->indicadores($usuario),
+            'accesos' => $bloqueado ? [] : $this->accesosRapidos($usuario),
         ]);
     }
 

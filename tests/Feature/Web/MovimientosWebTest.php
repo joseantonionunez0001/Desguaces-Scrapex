@@ -7,6 +7,8 @@ use App\Models\Desguace;
 use App\Models\Modulo;
 use App\Models\Movimiento;
 use App\Models\Pieza;
+use Database\Factories\DesguaceFactory;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -23,7 +25,9 @@ class MovimientosWebTest extends TestCase
 
     private function categoriaCoherente(string $nombre = 'Motor', string $desguace = 'Desguace Norte', string $modulo = 'Módulo A'): Categoria
     {
-        $desguaceCreado = Desguace::factory()->create(['nombre' => $desguace]);
+        // Los datos se crean en la sede de las cuentas de prueba (la sede por defecto).
+        $desguaceCreado = Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
+        $desguaceCreado->update(['nombre' => $desguace]);
         $moduloCreado = Modulo::factory()->create(['id_desguace' => $desguaceCreado->id_desguace, 'nombre_modulo' => $modulo]);
 
         return Categoria::factory()->create([
@@ -74,7 +78,7 @@ class MovimientosWebTest extends TestCase
             'id_categoria' => $categoria->categoria_id,
         ]);
 
-        foreach (['operario', 'gerente', 'administrador'] as $rol) {
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('movimientos.index'))
                 ->assertOk()
@@ -90,7 +94,7 @@ class MovimientosWebTest extends TestCase
         $categoria = $this->categoriaCoherente('Frenos', 'Desguace Levante', 'Módulo Z');
         Movimiento::factory()->create(['id_categoria' => $categoria->categoria_id]);
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('movimientos.index'))
             ->assertOk()
             ->assertSee('Desguace de la categoría')
@@ -99,7 +103,7 @@ class MovimientosWebTest extends TestCase
 
     public function test_estado_vacio_sin_movimientos(): void
     {
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('movimientos.index'))
             ->assertOk()
             ->assertSee('Todavía no hay movimientos')
@@ -124,7 +128,7 @@ class MovimientosWebTest extends TestCase
         Movimiento::factory()->create(['tipo_movimiento' => 'Entrada', 'id_categoria' => $motor->categoria_id]);
         Movimiento::factory()->create(['tipo_movimiento' => 'Ajuste', 'id_categoria' => $frenos->categoria_id]);
 
-        $usuario = $this->usuarioConRol('operario');
+        $usuario = $this->usuarioConRol('gerente');
 
         $this->actingAs($usuario)->get(route('movimientos.index', ['q' => 'Ajuste']))
             ->assertOk()
@@ -163,7 +167,7 @@ class MovimientosWebTest extends TestCase
         Movimiento::factory()->create(['tipo_movimiento' => 'Traspaso']);
         Movimiento::factory()->create(['tipo_movimiento' => 'Traspaso']);
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('movimientos.index'))
             ->assertViewHas('tipos', fn (array $tipos) => $tipos === ['Traspaso' => 'Traspaso']);
     }
@@ -172,7 +176,7 @@ class MovimientosWebTest extends TestCase
     {
         Movimiento::factory()->count(2)->create();
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('movimientos.index', ['desde' => '31/02/2026', 'hasta' => 'no-es-fecha', 'categoria' => 'abc', 'q' => ['x']]))
             ->assertOk()
             ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->total() === 2);
@@ -183,7 +187,7 @@ class MovimientosWebTest extends TestCase
         $categoria = $this->categoriaCoherente();
         Movimiento::factory()->count(16)->create(['tipo_movimiento' => 'Entrada', 'id_categoria' => $categoria->categoria_id]);
 
-        $usuario = $this->usuarioConRol('operario');
+        $usuario = $this->usuarioConRol('gerente');
 
         $this->actingAs($usuario)->get(route('movimientos.index', ['tipo' => 'Entrada']))
             ->assertOk()
@@ -199,16 +203,21 @@ class MovimientosWebTest extends TestCase
         $movimiento = Movimiento::factory()->create();
         $urlDeBorrado = route('movimientos.destroy', $movimiento);
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('movimientos.index'))->assertDontSee($urlDeBorrado);
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('movimientos.index'))->assertForbidden();
         $this->actingAs($this->usuarioConRol('gerente'))->get(route('movimientos.index'))->assertDontSee($urlDeBorrado);
-        $this->actingAs($this->usuarioConRol('administrador'))->get(route('movimientos.index'))->assertSee($urlDeBorrado);
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get(route('movimientos.index'))->assertSee($urlDeBorrado);
     }
 
-    public function test_operario_gerente_y_administrador_pueden_registrar_movimientos(): void
+    public function test_gerente_y_administrador_pueden_registrar_movimientos_y_el_operario_no(): void
     {
         $categoria = $this->categoriaCoherente();
 
-        foreach (['operario', 'gerente', 'administrador'] as $rol) {
+        // El operario es de solo lectura: no registra movimientos ni ve el módulo.
+        $operario = $this->usuarioConRol('operario');
+        $this->actingAs($operario)->get(route('movimientos.create'))->assertForbidden();
+        $this->actingAs($operario)->post(route('movimientos.store'), $this->datosValidos($categoria))->assertForbidden();
+
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $usuario = $this->usuarioConRol($rol);
 
             $this->actingAs($usuario)->get(route('movimientos.create'))
@@ -223,7 +232,8 @@ class MovimientosWebTest extends TestCase
                 ->assertSessionHas('success');
         }
 
-        $this->assertDatabaseCount('movimientos', 3);
+        // Uno por cada rol autorizado (gerente y administrador de desguace).
+        $this->assertDatabaseCount('movimientos', 2);
         $this->assertDatabaseHas('movimientos', [
             'tipo_movimiento' => 'Entrada',
             'cantidad' => 5,
@@ -237,7 +247,7 @@ class MovimientosWebTest extends TestCase
         $categoria = $this->categoriaCoherente();
         $pieza = Pieza::factory()->create(['stock' => 4]);
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->post(route('movimientos.store'), $this->datosValidos($categoria))
             ->assertRedirect(route('movimientos.index'));
 
@@ -246,7 +256,7 @@ class MovimientosWebTest extends TestCase
 
     public function test_el_formulario_avisa_si_no_hay_categorias(): void
     {
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('movimientos.create'))
             ->assertOk()
             ->assertSee('No hay categorías')
@@ -255,7 +265,7 @@ class MovimientosWebTest extends TestCase
 
     public function test_validacion_de_campos_obligatorios(): void
     {
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->from(route('movimientos.create'))
             ->post(route('movimientos.store'), [])
             ->assertRedirect(route('movimientos.create'))
@@ -267,7 +277,7 @@ class MovimientosWebTest extends TestCase
     public function test_validacion_de_valores_incorrectos(): void
     {
         $categoria = $this->categoriaCoherente();
-        $usuario = $this->usuarioConRol('operario');
+        $usuario = $this->usuarioConRol('gerente');
 
         $this->actingAs($usuario)->post(route('movimientos.store'), array_merge($this->datosValidos($categoria), [
             'tipo_movimiento' => str_repeat('a', 51),
@@ -287,7 +297,7 @@ class MovimientosWebTest extends TestCase
         $categoria = $this->categoriaCoherente();
         $categoria->delete();
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->post(route('movimientos.store'), $this->datosValidos($categoria))
             ->assertSessionHasErrors('id_categoria');
     }
@@ -301,7 +311,7 @@ class MovimientosWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('gerente'))->delete(route('movimientos.destroy', $movimiento))->assertForbidden();
         $this->assertNotSoftDeleted($movimiento);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('movimientos.destroy', $movimiento))
             ->assertRedirect(route('movimientos.index'))
             ->assertSessionHas('success');
@@ -311,7 +321,7 @@ class MovimientosWebTest extends TestCase
 
     public function test_eliminar_un_movimiento_inexistente_devuelve_404(): void
     {
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('movimientos.destroy', 999999))
             ->assertNotFound();
     }

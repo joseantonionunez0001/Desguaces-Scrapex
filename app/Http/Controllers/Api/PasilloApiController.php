@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Modulo;
 use App\Models\Pasillo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class PasilloApiController extends Controller
@@ -15,7 +17,7 @@ class PasilloApiController extends Controller
 
         return response()->json([
             'data' => $pasillos,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class PasilloApiController extends Controller
 
         return response()->json([
             'data' => $pasillo,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,18 +36,18 @@ class PasilloApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_modulo' => 'required|exists:modulos,id_modulo',
+            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
             'numero_pasillo' => 'required|string|max:50',
         ]);
 
-        $pasillo = new Pasillo();
+        $pasillo = new Pasillo;
         $pasillo->id_modulo = $datos['id_modulo'];
         $pasillo->numero_pasillo = $datos['numero_pasillo'];
         $pasillo->save();
 
         return response()->json([
             'data' => $pasillo,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class PasilloApiController extends Controller
         $pasillo = Pasillo::findOrFail($id);
 
         $datos = $request->validate([
-            'id_modulo' => 'required|exists:modulos,id_modulo',
+            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
             'numero_pasillo' => 'required|string|max:50',
         ]);
 
@@ -65,7 +67,7 @@ class PasilloApiController extends Controller
 
         return response()->json([
             'data' => $pasillo,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -77,7 +79,7 @@ class PasilloApiController extends Controller
 
         return response()->json([
             'data' => 'Pasillo eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

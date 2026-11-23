@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Models\Categoria;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * Alta y edición de tipos de pieza. Reproduce las reglas de TipoPiezaApiController.
@@ -29,7 +30,7 @@ class TipoPiezaRequest extends FormRequest
             'modelo' => ['required', 'string', 'max:255'],
             'fabricante' => ['required', 'string', 'max:255'],
             'categoria' => ['required', 'string', 'max:255'],
-            'id_categoria' => ['required', Rule::exists('categorias', 'categoria_id')->whereNull('deleted_at')],
+            'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ];
     }
 

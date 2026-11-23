@@ -41,6 +41,8 @@ class PermissionSeeder extends Seeder
         'usuarios.editar',
         'usuarios.eliminar',
         'usuarios.asignar_roles',
+        'usuarios.asignar_desguace',
+        'desguaces.asignar_administrador',
         'registro_sistema.ver',
         'registro_sistema.crear',
     ];

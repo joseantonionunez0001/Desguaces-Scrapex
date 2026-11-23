@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Desguace;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -10,7 +11,7 @@ use Tests\TestCase;
 
 class AutenticacionWebTest extends TestCase
 {
-    use RefreshDatabase, PreparaAutorizacion;
+    use PreparaAutorizacion, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -141,7 +142,10 @@ class AutenticacionWebTest extends TestCase
 
     public function test_el_dashboard_muestra_el_rol_del_usuario(): void
     {
-        $usuario = User::factory()->create(['name' => 'Gema Gerente']);
+        $usuario = User::factory()->create([
+            'name' => 'Gema Gerente',
+            'id_desguace' => Desguace::factory()->create()->id_desguace,
+        ]);
         $usuario->assignRole('gerente');
 
         $this->actingAs($usuario)

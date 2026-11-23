@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Pieza;
 use App\Models\TipoPieza;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -81,7 +82,7 @@ class PiezasWebTest extends TestCase
             'estado' => 'Reacondicionada',
         ]);
 
-        foreach (['administrador', 'gerente', 'operario'] as $rol) {
+        foreach ([RoleSeeder::ADMIN_DESGUACE, 'gerente', 'operario'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('piezas.index'))
                 ->assertOk()
@@ -233,7 +234,7 @@ class PiezasWebTest extends TestCase
             ->assertSee(route('piezas.edit', $pieza, false))
             ->assertDontSee('value="DELETE"', false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('piezas.index'))
             ->assertSee('Registrar pieza')
             ->assertSee(route('piezas.edit', $pieza, false))
@@ -288,7 +289,7 @@ class PiezasWebTest extends TestCase
             ->assertSee(route('piezas.edit', $pieza, false))
             ->assertDontSee('value="DELETE"', false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('piezas.show', $pieza))
             ->assertSee(route('piezas.edit', $pieza, false))
             ->assertSee('value="DELETE"', false);
@@ -298,7 +299,7 @@ class PiezasWebTest extends TestCase
     {
         $pieza = Pieza::factory()->create();
         $pieza->delete();
-        $this->actingAs($this->usuarioConRol('administrador'));
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE));
 
         $this->get(route('piezas.show', $pieza->id_pieza))->assertNotFound();
         $this->get('/piezas/999999')->assertNotFound();
@@ -445,7 +446,7 @@ class PiezasWebTest extends TestCase
     {
         $pieza = Pieza::factory()->create();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('piezas.destroy', $pieza))
             ->assertRedirect(route('piezas.index'))
             ->assertSessionHas('success');

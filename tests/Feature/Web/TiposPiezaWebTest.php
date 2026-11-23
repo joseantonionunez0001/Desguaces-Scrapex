@@ -7,6 +7,8 @@ use App\Models\Desguace;
 use App\Models\Modulo;
 use App\Models\Pieza;
 use App\Models\TipoPieza;
+use Database\Factories\DesguaceFactory;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\Support\PreparaAutorizacion;
@@ -24,7 +26,9 @@ class TiposPiezaWebTest extends TestCase
 
     private function categoriaCoherente(string $nombre = 'Motor', string $desguace = 'Desguace Norte'): Categoria
     {
-        $desguaceCreado = Desguace::factory()->create(['nombre' => $desguace]);
+        // Los datos se crean en la sede de las cuentas de prueba (la sede por defecto).
+        $desguaceCreado = Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
+        $desguaceCreado->update(['nombre' => $desguace]);
         $modulo = Modulo::factory()->create(['id_desguace' => $desguaceCreado->id_desguace]);
 
         return Categoria::factory()->create([
@@ -91,7 +95,7 @@ class TiposPiezaWebTest extends TestCase
         ]);
         Pieza::factory()->count(2)->create(['id_tipo_pieza' => $tipo->id_pieza]);
 
-        foreach (['operario', 'gerente', 'administrador'] as $rol) {
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('categorias.index'))
                 ->assertOk()
@@ -109,7 +113,7 @@ class TiposPiezaWebTest extends TestCase
     {
         $this->categoriaCoherente('Frenos');
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('categorias.index'))
             ->assertOk()
             ->assertSee('Sin tipos de pieza.');
@@ -122,7 +126,7 @@ class TiposPiezaWebTest extends TestCase
         TipoPieza::factory()->create(['nombre' => 'Pastillas', 'fabricante' => 'Ferodo', 'categoria' => 'Frenado', 'id_categoria' => $frenos->categoria_id]);
         TipoPieza::factory()->create(['nombre' => 'Disco', 'fabricante' => 'Brembo', 'categoria' => 'Frenado', 'id_categoria' => $frenos->categoria_id]);
         TipoPieza::factory()->create(['nombre' => 'Bujía', 'fabricante' => 'NGK', 'categoria' => 'Encendido', 'id_categoria' => $motor->categoria_id]);
-        $operario = $this->usuarioConRol('operario');
+        $operario = $this->usuarioConRol('gerente');
 
         $esperados = [
             'Pastillas' => ['Pastillas'],
@@ -150,13 +154,13 @@ class TiposPiezaWebTest extends TestCase
         $botonDeAlta = 'data-modal-open="crear-tipo-'.$categoria->categoria_id.'"';
         $formularioDeBorrado = 'name="_method" value="DELETE"';
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))
-            ->assertDontSee($botonDeAlta, false)->assertDontSee($botonDeEdicion, false)->assertDontSee($formularioDeBorrado, false);
+        // El operario no entra en la gestión de categorías y tipos.
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))->assertForbidden();
 
         $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
             ->assertSee($botonDeAlta, false)->assertSee($botonDeEdicion, false)->assertDontSee($formularioDeBorrado, false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))->get(route('categorias.index'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get(route('categorias.index'))
             ->assertSee($botonDeAlta, false)->assertSee($botonDeEdicion, false)->assertSee($formularioDeBorrado, false);
     }
 
@@ -167,9 +171,7 @@ class TiposPiezaWebTest extends TestCase
         $botonMarca = 'data-modal-open="crear-tipo-'.$categoria->categoria_id.'-'.md5('Seat').'"';
         $botonModelo = 'data-modal-open="crear-tipo-'.$categoria->categoria_id.'-'.md5('Seat|Ibiza').'"';
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))
-            ->assertDontSee($botonMarca, false)
-            ->assertDontSee($botonModelo, false);
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))->assertForbidden();
 
         $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
             ->assertSee($botonMarca, false)
@@ -198,7 +200,7 @@ class TiposPiezaWebTest extends TestCase
     {
         $categoria = $this->categoriaCoherente();
 
-        foreach (['gerente', 'administrador'] as $rol) {
+        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->post(route('tipos-pieza.store'), $this->datosValidos($categoria))
                 ->assertRedirect(route('categorias.index'))
@@ -252,7 +254,7 @@ class TiposPiezaWebTest extends TestCase
         $this->actingAs($this->usuarioConRol('gerente'))->delete(route('tipos-pieza.destroy', $tipo))->assertForbidden();
         $this->assertNotSoftDeleted($tipo);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('tipos-pieza.destroy', $tipo))
             ->assertRedirect(route('categorias.index'))
             ->assertSessionHas('success');
@@ -265,7 +267,7 @@ class TiposPiezaWebTest extends TestCase
         $tipo = TipoPieza::factory()->create();
         Pieza::factory()->create(['id_tipo_pieza' => $tipo->id_pieza]);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('tipos-pieza.destroy', $tipo))
             ->assertRedirect(route('categorias.index'))
             ->assertSessionHas('error');

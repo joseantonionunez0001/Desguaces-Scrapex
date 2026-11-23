@@ -9,6 +9,7 @@ use App\Models\Posicion;
 use App\Models\Sector;
 use App\Models\UbicacionVehiculo;
 use App\Models\Vehiculo;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
@@ -71,8 +72,8 @@ class VehiculoUbicacionesWebTest extends TestCase
             ->get(route('vehiculos.ubicaciones.index', $vehiculo))
             ->assertForbidden();
 
-        $ambos = $this->usuarioConRol(null);
-        $ambos->givePermissionTo(['vehiculos.ver', 'ubicaciones_vehiculo.ver']);
+        // Con los dos permisos (el operario los tiene) y la sede del vehículo, sí entra.
+        $ambos = $this->usuarioConRol('operario');
         $this->actingAs($ambos)
             ->get(route('vehiculos.ubicaciones.index', $vehiculo))
             ->assertOk();
@@ -82,7 +83,7 @@ class VehiculoUbicacionesWebTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create(['matricula' => '1010LLL', 'marca' => 'Volkswagen', 'modelo' => 'Golf']);
 
-        foreach (['administrador', 'gerente', 'operario'] as $rol) {
+        foreach ([RoleSeeder::ADMIN_DESGUACE, 'gerente', 'operario'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('vehiculos.ubicaciones.index', $vehiculo))
                 ->assertOk()
@@ -192,7 +193,7 @@ class VehiculoUbicacionesWebTest extends TestCase
             'fecha_inicio' => '2026-01-01',
             'fecha_fin' => null,
         ]);
-        $this->actingAs($this->usuarioConRol('administrador'));
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE));
 
         $this->get(route('vehiculos.ubicaciones.index', $vehiculo))
             ->assertOk()
@@ -207,7 +208,7 @@ class VehiculoUbicacionesWebTest extends TestCase
         $vehiculo = Vehiculo::factory()->create();
         $vehiculo->delete();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('vehiculos.ubicaciones.index', $vehiculo->id_vehiculo))
             ->assertNotFound();
     }

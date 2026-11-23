@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Web;
 
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -46,7 +47,7 @@ class RolesPermisosTest extends TestCase
     {
         $this->prepararRoles();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get($this->url())
             ->assertOk()
             ->assertSee('Roles y permisos')
@@ -63,7 +64,7 @@ class RolesPermisosTest extends TestCase
     {
         $this->prepararRoles();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get($this->url())
             ->assertSee('solo de consulta')
             ->assertSee('RolePermissionSeeder');
@@ -75,20 +76,26 @@ class RolesPermisosTest extends TestCase
     {
         $this->prepararRoles();
 
-        $respuesta = $this->actingAs($this->usuarioConRol('administrador'))->get($this->url())->assertOk();
+        $respuesta = $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get($this->url())->assertOk();
 
-        // Administrador: todo. Gerente: crea y edita vehículos, pero no elimina. Operario: solo consulta (y crea movimientos).
+        // Administrador de desguace: todo el inventario y su equipo. Plataforma: desguaces, sin inventario.
+        // Gerente: crea y edita vehículos, pero no elimina. Operario: solo consulta vehículos y piezas.
+        // Administrador (rol anterior): sin permisos.
         $respuesta
-            ->assertSee('Permitido: Eliminar vehículos (administrador)')
+            ->assertSee('Permitido: Eliminar vehículos ('.RoleSeeder::ADMIN_DESGUACE.')')
+            ->assertSee('Permitido: Crear desguaces ('.RoleSeeder::PLATAFORMA.')')
+            ->assertSee('No permitido: Ver vehículos ('.RoleSeeder::PLATAFORMA.')')
+            ->assertSee('No permitido: Crear desguaces ('.RoleSeeder::ADMIN_DESGUACE.')')
             ->assertSee('Permitido: Crear vehículos (gerente)')
             ->assertSee('No permitido: Eliminar vehículos (gerente)')
             ->assertSee('Permitido: Ver vehículos (operario)')
             ->assertSee('No permitido: Crear vehículos (operario)')
-            ->assertSee('Permitido: Crear movimientos (operario)')
-            ->assertSee('No permitido: Editar movimientos (operario)')
-            ->assertSee('Permitido: usuarios.asignar_roles (administrador)')
+            ->assertSee('No permitido: Crear movimientos (operario)')
+            ->assertSee('No permitido: Ver categorías (operario)')
+            ->assertSee('Permitido: usuarios.asignar_roles ('.RoleSeeder::ADMIN_DESGUACE.')')
             ->assertSee('No permitido: usuarios.asignar_roles (gerente)')
-            ->assertSee('No permitido: registro_sistema.ver (operario)');
+            ->assertSee('No permitido: registro_sistema.ver (operario)')
+            ->assertSee('No permitido: Ver vehículos ('.RoleSeeder::ADMINISTRADOR.')');
     }
 
     public function test_un_cambio_de_permisos_en_la_base_de_datos_se_refleja_en_la_pantalla(): void
@@ -96,7 +103,7 @@ class RolesPermisosTest extends TestCase
         $this->prepararRoles();
         Role::findByName('gerente', 'web')->revokePermissionTo('vehiculos.crear');
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get($this->url())
             ->assertSee('No permitido: Crear vehículos (gerente)')
             ->assertDontSee('Permitido: Crear vehículos (gerente)');
@@ -105,7 +112,7 @@ class RolesPermisosTest extends TestCase
     public function test_muestra_el_numero_de_usuarios_de_cada_rol_sin_contar_los_eliminados(): void
     {
         $this->prepararRoles();
-        $administrador = $this->usuarioConRol('administrador');
+        $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
         $this->usuarioConRol('gerente');
         $this->usuarioConRol('gerente');
         $this->usuarioConRol('gerente')->delete();
@@ -134,7 +141,7 @@ class RolesPermisosTest extends TestCase
     public function test_la_pantalla_no_tiene_rutas_de_modificacion(): void
     {
         $this->prepararRoles();
-        $administrador = $this->usuarioConRol('administrador');
+        $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
 
         $this->actingAs($administrador)->post($this->url(), [])->assertStatus(405);
         $this->actingAs($administrador)->put($this->url(), [])->assertStatus(405);

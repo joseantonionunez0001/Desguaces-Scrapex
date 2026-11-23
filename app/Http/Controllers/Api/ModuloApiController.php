@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Desguace;
 use App\Models\Modulo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 
 class ModuloApiController extends Controller
@@ -15,7 +17,7 @@ class ModuloApiController extends Controller
 
         return response()->json([
             'data' => $modulos,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -26,7 +28,7 @@ class ModuloApiController extends Controller
 
         return response()->json([
             'data' => $modulo,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -34,18 +36,18 @@ class ModuloApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'nombre_modulo' => 'required|string|max:255',
         ]);
 
-        $modulo = new Modulo();
+        $modulo = new Modulo;
         $modulo->id_desguace = $datos['id_desguace'];
         $modulo->nombre_modulo = $datos['nombre_modulo'];
         $modulo->save();
 
         return response()->json([
             'data' => $modulo,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -55,7 +57,7 @@ class ModuloApiController extends Controller
         $modulo = Modulo::findOrFail($id);
 
         $datos = $request->validate([
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'nombre_modulo' => 'required|string|max:255',
         ]);
 
@@ -65,7 +67,7 @@ class ModuloApiController extends Controller
 
         return response()->json([
             'data' => $modulo,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -77,7 +79,7 @@ class ModuloApiController extends Controller
 
         return response()->json([
             'data' => 'Modulo eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

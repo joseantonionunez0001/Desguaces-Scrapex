@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Desguace;
 use App\Models\Vehiculo;
+use App\Rules\ExisteEnMiSede;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -16,7 +18,7 @@ class VehiculoApiController extends Controller
 
         return response()->json([
             'data' => $vehiculos,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -27,7 +29,7 @@ class VehiculoApiController extends Controller
 
         return response()->json([
             'data' => $vehiculo,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -35,7 +37,7 @@ class VehiculoApiController extends Controller
     public function store(Request $request)
     {
         $datos = $request->validate([
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'matricula' => 'required|string|max:20|unique:vehiculos,matricula',
             'marca' => 'required|string|max:255',
             'modelo' => 'required|string|max:255',
@@ -44,7 +46,7 @@ class VehiculoApiController extends Controller
             'estado_tratamiento' => 'required|string|max:100',
         ]);
 
-        $vehiculo = new Vehiculo();
+        $vehiculo = new Vehiculo;
         $vehiculo->id_desguace = $datos['id_desguace'];
         $vehiculo->matricula = $datos['matricula'];
         $vehiculo->marca = $datos['marca'];
@@ -56,7 +58,7 @@ class VehiculoApiController extends Controller
 
         return response()->json([
             'data' => $vehiculo,
-            'success' => 1
+            'success' => 1,
         ], 201);
     }
 
@@ -66,7 +68,7 @@ class VehiculoApiController extends Controller
         $vehiculo = Vehiculo::findOrFail($id);
 
         $datos = $request->validate([
-            'id_desguace' => 'required|exists:desguaces,id_desguace',
+            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
             'matricula' => [
                 'required',
                 'string',
@@ -96,7 +98,7 @@ class VehiculoApiController extends Controller
 
         return response()->json([
             'data' => $vehiculo,
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 
@@ -108,7 +110,7 @@ class VehiculoApiController extends Controller
 
         return response()->json([
             'data' => 'Vehiculo eliminado',
-            'success' => 1
+            'success' => 1,
         ], 200);
     }
 }

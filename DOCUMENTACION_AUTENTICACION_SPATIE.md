@@ -1,5 +1,7 @@
 # Autenticación y autorización con Spatie Laravel Permission
 
+> **Actualización:** los roles, la matriz de permisos y los comandos de esta página han cambiado. Consulta `DOCUMENTACION_ACCESO_POR_DESGUACE.md`. El comando `desguace:asignar-administrador` ya no existe.
+
 ## 1. Versiones
 
 - PHP 8.5.11.

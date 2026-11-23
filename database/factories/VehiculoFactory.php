@@ -2,11 +2,11 @@
 
 namespace Database\Factories;
 
-use App\Models\Desguace;
+use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<\App\Models\Vehiculo>
+ * @extends Factory<Vehiculo>
  */
 class VehiculoFactory extends Factory
 {
@@ -28,7 +28,7 @@ class VehiculoFactory extends Factory
         $vehiculo = fake()->randomElement($catalogo);
 
         return [
-            'id_desguace' => Desguace::factory(),
+            'id_desguace' => fn (): int => DesguaceFactory::idPorDefecto(),
             'matricula' => fake()->unique()->regexify('[0-9]{4}[BCDFGHJKLMNPRSTVWXYZ]{3}'),
             'marca' => $vehiculo['marca'],
             'modelo' => $vehiculo['modelo'],

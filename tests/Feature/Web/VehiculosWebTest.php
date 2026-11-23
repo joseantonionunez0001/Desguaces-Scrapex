@@ -11,6 +11,7 @@ use App\Models\Posicion;
 use App\Models\Sector;
 use App\Models\UbicacionVehiculo;
 use App\Models\Vehiculo;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\Support\PreparaAutorizacion;
@@ -89,7 +90,7 @@ class VehiculosWebTest extends TestCase
             'fecha_llegada' => '2026-02-03',
         ]);
 
-        foreach (['administrador', 'gerente', 'operario'] as $rol) {
+        foreach ([RoleSeeder::ADMIN_DESGUACE, 'gerente', 'operario'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('vehiculos.index'))
                 ->assertOk()
@@ -151,12 +152,20 @@ class VehiculosWebTest extends TestCase
         $sur = Desguace::factory()->create();
         Vehiculo::factory()->create(['id_desguace' => $norte->id_desguace, 'matricula' => '7001NNN']);
         Vehiculo::factory()->create(['id_desguace' => $sur->id_desguace, 'matricula' => '7002SSS']);
+        $operarioDelSur = $this->usuarioConRol('operario', $sur);
 
-        $this->actingAs($this->usuarioConRol('operario'))
+        $this->actingAs($operarioDelSur)
             ->get(route('vehiculos.index', ['desguace' => $sur->id_desguace]))
             ->assertOk()
             ->assertSee('7002SSS')
             ->assertDontSee('7001NNN');
+
+        // Filtrar por otra sede no sirve para ver sus vehículos.
+        $this->actingAs($operarioDelSur)
+            ->get(route('vehiculos.index', ['desguace' => $norte->id_desguace]))
+            ->assertOk()
+            ->assertDontSee('7001NNN')
+            ->assertDontSee('7002SSS');
     }
 
     public function test_el_listado_filtra_por_estado_y_ofrece_los_estados_reales(): void
@@ -224,7 +233,7 @@ class VehiculosWebTest extends TestCase
             ->assertSee(route('vehiculos.edit', $vehiculo, false))
             ->assertDontSee('value="DELETE"', false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('vehiculos.index'))
             ->assertSee('Registrar vehículo')
             ->assertSee(route('vehiculos.edit', $vehiculo, false))
@@ -306,7 +315,7 @@ class VehiculosWebTest extends TestCase
 
         $vehiculo = Vehiculo::factory()->create();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('vehiculos.show', $vehiculo))
             ->assertOk()
             ->assertDontSee('Asignar ubicación');
@@ -345,7 +354,7 @@ class VehiculosWebTest extends TestCase
             ->assertSee(route('vehiculos.edit', $vehiculo, false))
             ->assertDontSee('value="DELETE"', false);
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->get(route('vehiculos.show', $vehiculo))
             ->assertSee(route('vehiculos.edit', $vehiculo, false))
             ->assertSee('value="DELETE"', false);
@@ -355,7 +364,7 @@ class VehiculosWebTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create();
         $vehiculo->delete();
-        $this->actingAs($this->usuarioConRol('administrador'));
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE));
 
         $this->get(route('vehiculos.show', $vehiculo->id_vehiculo))->assertNotFound();
         $this->get('/vehiculos/999999')->assertNotFound();
@@ -507,7 +516,7 @@ class VehiculosWebTest extends TestCase
     {
         $vehiculo = Vehiculo::factory()->create();
 
-        $this->actingAs($this->usuarioConRol('administrador'))
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
             ->delete(route('vehiculos.destroy', $vehiculo))
             ->assertRedirect(route('vehiculos.index'))
             ->assertSessionHas('success');
