@@ -12,9 +12,8 @@
         <header class="bg-blue-950 text-white">
             <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
                 <a href="{{ route('home') }}" class="flex items-center gap-3 text-base font-bold tracking-tight">
-                    <span class="flex size-9 items-center justify-center rounded-lg bg-blue-600">
-                        <x-ui.icon name="truck" class="size-5" />
-                    </span>
+                    <img src="{{ asset('images/logo.png') }}" alt="" class="h-10 w-auto rounded-md bg-white p-0.5">
+
                     {{ config('navegacion.marca') }}
                 </a>
                 <nav class="flex items-center gap-2" aria-label="Acceso">

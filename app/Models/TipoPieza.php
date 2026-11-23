@@ -13,10 +13,13 @@ class TipoPieza extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'tipo_piezas';
+
     protected $primaryKey = 'id_pieza';
 
     protected $fillable = [
         'nombre',
+        'marca',
+        'modelo',
         'fabricante',
         'categoria',
         'id_categoria',

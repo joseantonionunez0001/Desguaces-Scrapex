@@ -6,6 +6,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Panel') · {{ config('navegacion.marca') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    {{-- Estilos de los avisos flotantes (PHPFlasher). Se publican con php artisan flasher:install. --}}
+    <link rel="stylesheet" href="{{ asset('vendor/flasher/flasher.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/flasher/themes/flasher/flasher.min.css') }}">
 </head>
 <body class="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
     {{--
@@ -24,7 +27,6 @@
             <x-layout.topbar />
 
             <main id="contenido" class="flex-1 p-4 sm:p-6 lg:p-8">
-                <x-ui.flash />
                 @yield('content')
             </main>
 
@@ -35,5 +37,15 @@
     </div>
 
     @stack('scripts')
+
+    {{-- Mensajes de sesión (success, error, warning, info) como avisos flotantes con la API JS de flasher. Ver config/flasher.php. --}}
+    @foreach (['success', 'error', 'warning', 'info'] as $tipo)
+        @if (session()->has($tipo))
+            <script>
+                window.addEventListener('load', () => window.flasher?.{{ $tipo }}(@json(session($tipo))));
+            </script>
+        @endif
+    @endforeach
+    @flasher_render
 </body>
 </html>

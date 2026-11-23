@@ -27,6 +27,8 @@ class TipoPiezaFactory extends Factory
     {
         return [
             'nombre' => fake()->randomElement(['Alternador', 'Puerta delantera', 'Faro izquierdo', 'Motor de arranque', 'Radiador', 'Retrovisor derecho', 'Intermitente trasero', 'Caja de cambios']),
+            'marca' => fake()->randomElement(['Seat', 'Renault', 'Volkswagen', 'Ford', 'Peugeot', 'Opel']),
+            'modelo' => fake()->randomElement(['Ibiza', 'Clio', 'Golf', 'Focus', '308', 'Corsa']),
             'fabricante' => fake()->randomElement(['Autopartes Levante S.L.', 'Componentes Meseta S.A.', 'Recambios Norte S.L.', 'Industrias Cantábrica S.A.', 'Piezas Ibéricas S.L.']),
             'categoria' => fake()->randomElement(['Motor', 'Carrocería', 'Iluminación', 'Transmisión', 'Suspensión', 'Electricidad']),
             'id_categoria' => Categoria::factory(),
