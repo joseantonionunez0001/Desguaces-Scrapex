@@ -4,30 +4,30 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Posicion extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'posiciones';
-
-    protected $primaryKey = 'id';
+    protected $primaryKey = 'id_posicion';
 
     protected $fillable = [
-        'fila_id',
+        'id_fila',
         'numero_posicion',
-        'capacidad_maxima'
+        'capacidad_maxima',
     ];
 
-    // Una posición pertenece a una fila.
-    public function fila()
+    public function fila(): BelongsTo
     {
-        return $this->belongsTo(Fila::class);
+        return $this->belongsTo(Fila::class, 'id_fila', 'id_fila');
     }
 
-    // Una posición tiene varios niveles.
-    public function niveles()
+    public function niveles(): HasMany
     {
-        return $this->hasMany(Nivel::class);
+        return $this->hasMany(Nivel::class, 'id_posicion');
     }
 }
