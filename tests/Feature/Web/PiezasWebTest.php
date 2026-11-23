@@ -3,40 +3,86 @@
 namespace Tests\Feature\Web;
 
 use App\Models\Categoria;
+use App\Models\Etiqueta;
+use App\Models\ModeloVehiculo;
+use App\Models\Movimiento;
 use App\Models\Pieza;
 use App\Models\TipoPieza;
-use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
 
 /**
- * Pantallas web de piezas: listado, ficha y formularios de alta, edición y baja.
+ * Pantallas web de piezas: listado con filtros combinables, ficha, alta (con Entrada inicial) y edición.
+ * El flujo de movimientos y existencias se prueba en InventarioPiezasWebTest.
  */
 class PiezasWebTest extends TestCase
 {
     use PreparaAutorizacion, RefreshDatabase;
 
+    private Categoria $electricidad;
+
+    private Categoria $carroceria;
+
+    private TipoPieza $alternador;
+
+    private TipoPieza $puerta;
+
+    private ModeloVehiculo $ibiza;
+
+    private ModeloVehiculo $leon;
+
+    private ModeloVehiculo $clio;
+
+    private Etiqueta $hueco;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->prepararRoles();
+
+        $this->electricidad = Categoria::factory()->create(['nombre' => 'Electricidad', 'id_modulo' => null]);
+        $this->carroceria = Categoria::factory()->create(['nombre' => 'Carrocería', 'id_modulo' => null]);
+        $this->alternador = TipoPieza::factory()->create(['nombre' => 'Alternador', 'fabricante' => 'Bosch', 'id_categoria' => $this->electricidad->categoria_id]);
+        $this->puerta = TipoPieza::factory()->create(['nombre' => 'Puerta', 'fabricante' => null, 'id_categoria' => $this->carroceria->categoria_id]);
+        $this->ibiza = $this->modeloDeVehiculo('Seat', 'Ibiza');
+        $this->leon = $this->modeloDeVehiculo('Seat', 'León');
+        $this->clio = $this->modeloDeVehiculo('Renault', 'Clio');
+        $this->hueco = $this->hueco('A-01');
+    }
+
+    /**
+     * @param  array<string, mixed>  $atributos
+     */
+    private function pieza(array $atributos = []): Pieza
+    {
+        return Pieza::factory()->create($atributos + [
+            'id_tipo_pieza' => $this->alternador->id_pieza,
+            'id_modelo_vehiculo' => $this->ibiza->id_modelo,
+            'estado' => 'Buen estado',
+        ]);
     }
 
     /**
      * @param  array<string, mixed>  $sobrescribir
      * @return array<string, mixed>
      */
-    private function datosPieza(TipoPieza $tipo, array $sobrescribir = []): array
+    private function alta(array $sobrescribir = []): array
     {
         return array_merge([
-            'nombre' => 'Alternador Bosch',
-            'precio' => '120.50',
-            'estado' => 'Usada',
-            'stock' => 4,
+            'nombre' => 'Alternador 90A',
+            'id_marca' => $this->ibiza->id_marca,
+            'id_modelo_vehiculo' => $this->ibiza->id_modelo,
+            'id_categoria' => $this->electricidad->categoria_id,
+            'id_tipo_pieza' => $this->alternador->id_pieza,
+            'estado' => 'Buen estado',
+            'precio' => '85.50',
             'stock_minimo' => 2,
-            'id_tipo_pieza' => $tipo->id_pieza,
+            'cantidad' => 5,
+            'id_etiqueta' => $this->hueco->id_etiqueta,
+            'clave_envio' => (string) Str::uuid(),
         ], $sobrescribir);
     }
 
@@ -44,49 +90,49 @@ class PiezasWebTest extends TestCase
 
     public function test_un_invitado_es_redirigido_al_login(): void
     {
-        $pieza = Pieza::factory()->create();
+        $pieza = $this->pieza();
 
         $this->get(route('piezas.index'))->assertRedirect(route('login'));
         $this->get(route('piezas.show', $pieza))->assertRedirect(route('login'));
         $this->get(route('piezas.create'))->assertRedirect(route('login'));
-        $this->get(route('piezas.edit', $pieza))->assertRedirect(route('login'));
         $this->post(route('piezas.store'), [])->assertRedirect(route('login'));
-        $this->delete(route('piezas.destroy', $pieza))->assertRedirect(route('login'));
     }
 
     public function test_un_usuario_sin_rol_recibe_403_en_todas_las_rutas(): void
     {
-        $pieza = Pieza::factory()->create();
+        $pieza = $this->pieza();
         $this->actingAs($this->usuarioConRol(null));
 
         $this->get(route('piezas.index'))->assertForbidden();
         $this->get(route('piezas.show', $pieza))->assertForbidden();
         $this->get(route('piezas.create'))->assertForbidden();
-        $this->post(route('piezas.store'), [])->assertForbidden();
+        $this->post(route('piezas.store'), $this->alta())->assertForbidden();
         $this->get(route('piezas.edit', $pieza))->assertForbidden();
         $this->put(route('piezas.update', $pieza), [])->assertForbidden();
-        $this->delete(route('piezas.destroy', $pieza))->assertForbidden();
+    }
+
+    public function test_ya_no_hay_borrado_directo_de_piezas(): void
+    {
+        $pieza = $this->pieza();
+
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
+            ->delete('/piezas/'.$pieza->id_pieza)
+            ->assertStatus(405);
+
+        $this->assertNotSoftDeleted($pieza);
     }
 
     // ---------- Listado ----------
 
     public function test_cada_rol_autorizado_ve_el_listado_con_datos_reales(): void
     {
-        $tipo = TipoPieza::factory()->create(['nombre' => 'Tipo Alternador']);
-        Pieza::factory()->create([
-            'nombre' => 'Alternador Valeo',
-            'id_tipo_pieza' => $tipo->id_pieza,
-            'precio' => 1234.5,
-            'stock' => 7,
-            'stock_minimo' => 3,
-            'estado' => 'Reacondicionada',
-        ]);
+        $this->pieza(['nombre' => 'Alternador Bosch 90A', 'precio' => 120.5, 'stock' => 4, 'stock_minimo' => 1]);
 
         foreach ([RoleSeeder::ADMIN_DESGUACE, 'gerente', 'operario'] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('piezas.index'))
                 ->assertOk()
-                ->assertSeeInOrder(['Alternador Valeo', 'Tipo Alternador', '1.234,50 €', '7', '3', 'Reacondicionada', 'Disponible']);
+                ->assertSeeInOrder(['Alternador Bosch 90A', 'Seat Ibiza', 'Electricidad', 'Alternador', '120,50 €', '4', '1', 'Buen estado', 'Con stock']);
         }
     }
 
@@ -98,373 +144,308 @@ class PiezasWebTest extends TestCase
             ->assertSee('No hay piezas registradas');
     }
 
-    public function test_el_listado_ordena_las_mas_recientes_primero_y_no_muestra_borradas(): void
+    public function test_el_listado_ordena_las_mas_recientes_primero_y_no_muestra_archivadas(): void
     {
-        Pieza::factory()->create(['nombre' => 'Primera pieza']);
-        Pieza::factory()->create(['nombre' => 'Segunda pieza']);
-        Pieza::factory()->create(['nombre' => 'Pieza borrada'])->delete();
+        $this->pieza(['nombre' => 'Primera pieza']);
+        $this->pieza(['nombre' => 'Segunda pieza']);
+        $this->pieza(['nombre' => 'Pieza archivada'])->delete();
 
         $this->actingAs($this->usuarioConRol('operario'))
             ->get(route('piezas.index'))
             ->assertSeeInOrder(['Segunda pieza', 'Primera pieza'])
-            ->assertDontSee('Pieza borrada');
+            ->assertDontSee('Pieza archivada');
     }
 
-    public function test_el_listado_pagina_de_15_en_15(): void
+    public function test_el_listado_pagina_de_15_en_15_y_conserva_los_filtros(): void
     {
-        Pieza::factory()->count(16)->create();
-        $this->actingAs($this->usuarioConRol('operario'));
+        foreach (range(1, 16) as $numero) {
+            $this->pieza(['nombre' => "Pieza {$numero}", 'stock' => 5, 'stock_minimo' => 1]);
+        }
+        $usuario = $this->usuarioConRol('operario');
+        $filtros = ['marca' => $this->ibiza->id_marca, 'disponibilidad' => Pieza::CON_STOCK];
 
-        $this->assertCount(15, $this->get(route('piezas.index'))->viewData('piezas'));
-        $this->assertCount(1, $this->get(route('piezas.index', ['page' => 2]))->viewData('piezas'));
+        $primera = $this->actingAs($usuario)->get(route('piezas.index', $filtros));
+        $this->assertCount(15, $primera->viewData('piezas'));
+        $primera->assertSee('marca='.$this->ibiza->id_marca.'&amp;disponibilidad=con_stock&amp;page=2', false);
+
+        $segunda = $this->actingAs($usuario)->get(route('piezas.index', $filtros + ['page' => 2]));
+        $this->assertCount(1, $segunda->viewData('piezas'));
     }
 
-    public function test_el_buscador_filtra_por_nombre(): void
+    public function test_los_filtros_se_combinan(): void
     {
-        Pieza::factory()->create(['nombre' => 'Radiador aluminio']);
-        Pieza::factory()->create(['nombre' => 'Faro halogeno']);
+        $buscada = $this->pieza(['nombre' => 'Alternador Ibiza', 'stock' => 1, 'stock_minimo' => 2, 'estado' => 'Buen estado']);
+        $this->pieza(['nombre' => 'Alternador León', 'id_modelo_vehiculo' => $this->leon->id_modelo, 'stock' => 1, 'stock_minimo' => 2]);
+        $this->pieza(['nombre' => 'Alternador Clio', 'id_modelo_vehiculo' => $this->clio->id_modelo, 'stock' => 1, 'stock_minimo' => 2]);
+        $this->pieza(['nombre' => 'Alternador dañado', 'stock' => 1, 'stock_minimo' => 2, 'estado' => 'Dañada']);
+        $this->pieza(['nombre' => 'Alternador con stock', 'stock' => 9, 'stock_minimo' => 2]);
+        $this->pieza(['nombre' => 'Puerta Ibiza', 'id_tipo_pieza' => $this->puerta->id_pieza, 'stock' => 1, 'stock_minimo' => 2]);
+        $usuario = $this->usuarioConRol('gerente');
 
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('piezas.index', ['q' => 'radiad']))
-            ->assertSee('Radiador aluminio')
-            ->assertDontSee('Faro halogeno');
+        $ids = fn (array $filtros) => $this->actingAs($usuario)->get(route('piezas.index', $filtros))
+            ->assertOk()->viewData('piezas')->pluck('id_pieza')->all();
+
+        $this->assertSame([$buscada->id_pieza], $ids([
+            'marca' => $this->ibiza->id_marca,
+            'modelo' => $this->ibiza->id_modelo,
+            'categoria' => $this->electricidad->categoria_id,
+            'tipo' => $this->alternador->id_pieza,
+            'estado' => 'Buen estado',
+            'disponibilidad' => Pieza::STOCK_BAJO,
+        ]));
+
+        // Cada filtro por separado.
+        $this->assertCount(5, $ids(['marca' => $this->ibiza->id_marca]));
+        $this->assertCount(4, $ids(['modelo' => $this->ibiza->id_modelo]));
+        $this->assertCount(1, $ids(['categoria' => $this->carroceria->categoria_id]));
+        $this->assertCount(1, $ids(['estado' => 'Dañada']));
+        $this->assertCount(1, $ids(['disponibilidad' => Pieza::CON_STOCK]));
+        $this->assertCount(1, $ids(['q' => 'Clio']));
     }
 
-    public function test_el_listado_filtra_por_tipo_de_pieza(): void
+    public function test_la_disponibilidad_se_calcula_con_las_existencias(): void
     {
-        $motor = TipoPieza::factory()->create(['nombre' => 'Tipo motor']);
-        $luces = TipoPieza::factory()->create(['nombre' => 'Tipo luces']);
-        Pieza::factory()->create(['nombre' => 'Culata completa', 'id_tipo_pieza' => $motor->id_pieza]);
-        Pieza::factory()->create(['nombre' => 'Piloto trasero', 'id_tipo_pieza' => $luces->id_pieza]);
+        $conStock = $this->pieza(['nombre' => 'Con unidades', 'stock' => 5, 'stock_minimo' => 2]);
+        $bajo = $this->pieza(['nombre' => 'En el mínimo', 'stock' => 2, 'stock_minimo' => 2]);
+        $agotada = $this->pieza(['nombre' => 'Sin unidades', 'stock' => 0, 'stock_minimo' => 0]);
+        $usuario = $this->usuarioConRol('operario');
 
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('piezas.index', ['tipo' => $luces->id_pieza]))
-            ->assertSee('Piloto trasero')
-            ->assertDontSee('Culata completa');
-    }
+        $this->assertSame(Pieza::CON_STOCK, $conStock->disponibilidad());
+        $this->assertSame(Pieza::STOCK_BAJO, $bajo->disponibilidad());
+        // Stock cero con mínimo cero: agotada, no «stock bajo».
+        $this->assertSame(Pieza::AGOTADA, $agotada->disponibilidad());
 
-    public function test_el_listado_filtra_por_estado_y_ofrece_los_estados_reales(): void
-    {
-        Pieza::factory()->create(['nombre' => 'Bomba de agua', 'estado' => 'Garantizada']);
-        Pieza::factory()->create(['nombre' => 'Polea tensora', 'estado' => 'Usada']);
-        $this->actingAs($this->usuarioConRol('operario'));
+        foreach ([Pieza::CON_STOCK => $conStock, Pieza::STOCK_BAJO => $bajo, Pieza::AGOTADA => $agotada] as $filtro => $pieza) {
+            $this->assertSame([$pieza->id_pieza], $this->actingAs($usuario)->get(route('piezas.index', ['disponibilidad' => $filtro]))
+                ->viewData('piezas')->pluck('id_pieza')->all());
+        }
 
-        $this->get(route('piezas.index'))
-            ->assertSee('<option value="Garantizada"', false)
-            ->assertSee('<option value="Usada"', false);
-
-        $this->get(route('piezas.index', ['estado' => 'Garantizada']))
-            ->assertSee('Bomba de agua')
-            ->assertDontSee('Polea tensora');
-    }
-
-    public function test_el_listado_filtra_por_disponibilidad_y_stock_bajo(): void
-    {
-        Pieza::factory()->create(['nombre' => 'Pieza con stock bajo', 'stock' => 1, 'stock_minimo' => 2]);
-        Pieza::factory()->create(['nombre' => 'Pieza abundante', 'stock' => 10, 'stock_minimo' => 2]);
-        Pieza::factory()->create(['nombre' => 'Pieza agotada', 'stock' => 0, 'stock_minimo' => 1]);
-        $this->actingAs($this->usuarioConRol('operario'));
-
-        $this->get(route('piezas.index', ['disponibilidad' => 'disponible']))
-            ->assertSee('Pieza con stock bajo')
-            ->assertSee('Pieza abundante')
-            ->assertDontSee('Pieza agotada');
-
-        $this->get(route('piezas.index', ['disponibilidad' => 'agotada']))
-            ->assertSee('Pieza agotada')
-            ->assertDontSee('Pieza abundante')
-            ->assertDontSee('Pieza con stock bajo');
-
-        $this->get(route('piezas.index', ['disponibilidad' => 'stock_bajo']))
-            ->assertSee('Pieza con stock bajo')
-            ->assertSee('Pieza agotada')
-            ->assertDontSee('Pieza abundante');
-    }
-
-    public function test_el_listado_marca_la_disponibilidad_y_el_stock_bajo(): void
-    {
-        Pieza::factory()->create(['stock' => 5, 'stock_minimo' => 5]);
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('piezas.index'))
-            ->assertSee('>Disponible</span>', false)
-            ->assertSee('>Stock bajo</span>', false);
-
-        Pieza::query()->delete();
-        Pieza::factory()->create(['stock' => 9, 'stock_minimo' => 2]);
-        $this->get(route('piezas.index'))
-            ->assertSee('>Disponible</span>', false)
-            ->assertDontSee('>Stock bajo</span>', false);
-
-        Pieza::query()->delete();
-        Pieza::factory()->create(['stock' => 0, 'stock_minimo' => 2]);
-        $this->get(route('piezas.index'))
-            ->assertSee('>No disponible</span>', false)
-            ->assertSee('>Stock bajo</span>', false);
+        $this->actingAs($usuario)->get(route('piezas.show', $bajo))->assertSee('Stock bajo')->assertSee('el mínimo es 2');
+        $this->actingAs($usuario)->get(route('piezas.show', $agotada))->assertSee('Agotada');
     }
 
     public function test_el_listado_sin_coincidencias_ofrece_limpiar_filtros_y_los_filtros_invalidos_se_ignoran(): void
     {
-        Pieza::factory()->create(['nombre' => 'Pieza visible']);
-        $this->actingAs($this->usuarioConRol('operario'));
+        $this->pieza(['nombre' => 'Faro']);
+        $usuario = $this->usuarioConRol('operario');
 
-        $this->get(route('piezas.index', ['q' => 'no-existe-nada']))
-            ->assertOk()
+        $this->actingAs($usuario)->get(route('piezas.index', ['q' => 'inexistente']))
             ->assertSee('Sin resultados')
             ->assertSee('Limpiar filtros');
 
-        $this->get(route('piezas.index', ['tipo' => 'abc', 'disponibilidad' => 'inventada']))
+        $this->actingAs($usuario)->get(route('piezas.index', ['marca' => 'abc', 'disponibilidad' => 'otra', 'tipo' => '-1']))
             ->assertOk()
-            ->assertSee('Pieza visible');
+            ->assertSee('Faro');
+    }
+
+    public function test_al_elegir_una_marca_o_una_categoria_se_ofrecen_sus_modelos_y_tipos(): void
+    {
+        $pagina = $this->actingAs($this->usuarioConRol('gerente'))->get(route('piezas.index'))->assertOk();
+
+        // Cada modelo y cada tipo lleva su padre: el desplegable dependiente filtra con él.
+        $pagina->assertSee('data-depende-de="marca"', false)->assertSee('data-depende-de="categoria"', false);
+        $html = $pagina->getContent();
+        $opcion = fn (int $valor, int $padre): string => '/<option value="'.$valor.'"\s+data-padre="'.$padre.'"/';
+
+        $this->assertMatchesRegularExpression($opcion($this->leon->id_modelo, $this->ibiza->id_marca), $html);
+        $this->assertMatchesRegularExpression($opcion($this->clio->id_modelo, $this->clio->id_marca), $html);
+        $this->assertMatchesRegularExpression($opcion($this->puerta->id_pieza, $this->carroceria->categoria_id), $html);
     }
 
     public function test_los_botones_del_listado_dependen_del_permiso(): void
     {
-        $pieza = Pieza::factory()->create();
+        $pieza = $this->pieza();
 
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('piezas.index'))
-            ->assertSee(route('piezas.show', $pieza, false))
-            ->assertDontSee('Registrar pieza')
-            ->assertDontSee(route('piezas.edit', $pieza, false))
-            ->assertDontSee('value="DELETE"', false);
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('piezas.index'))
+            ->assertDontSee(route('piezas.create'))
+            ->assertDontSee(route('piezas.edit', $pieza));
 
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('piezas.index'))
-            ->assertSee('Registrar pieza')
-            ->assertSee(route('piezas.edit', $pieza, false))
-            ->assertDontSee('value="DELETE"', false);
-
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
-            ->get(route('piezas.index'))
-            ->assertSee('Registrar pieza')
-            ->assertSee(route('piezas.edit', $pieza, false))
-            ->assertSee('value="DELETE"', false);
+        $this->actingAs($this->usuarioConRol('gerente'))->get(route('piezas.index'))
+            ->assertSee(route('piezas.create'))
+            ->assertSee(route('piezas.edit', $pieza))
+            ->assertSee(route('movimientos.create', ['pieza' => $pieza->id_pieza]), false);
     }
 
     // ---------- Ficha ----------
 
-    public function test_la_ficha_muestra_tipo_fabricante_categoria_y_usuario_que_la_registro(): void
+    public function test_la_ficha_muestra_vehiculo_clasificacion_existencias_y_usuario(): void
     {
-        $categoria = Categoria::factory()->create(['nombre' => 'Categoría Eléctrica']);
-        $tipo = TipoPieza::factory()->create([
-            'nombre' => 'Tipo Arranque',
-            'fabricante' => 'Fabricante Test S.L.',
-            'id_categoria' => $categoria->categoria_id,
-        ]);
-        $registrador = User::factory()->create(['name' => 'Marta Registradora', 'email' => 'marta.privada@example.test']);
-        $pieza = Pieza::factory()->create([
-            'nombre' => 'Motor de arranque Denso',
-            'precio' => 89.9,
-            'stock' => 6,
-            'stock_minimo' => 2,
-            'estado' => 'Usada',
-            'id_usuario' => $registrador->id,
-            'id_tipo_pieza' => $tipo->id_pieza,
-        ]);
+        $gerente = $this->usuarioConRol('gerente');
+        $this->actingAs($gerente)->post(route('piezas.store'), $this->alta(['cantidad' => 3]));
+        $pieza = Pieza::firstOrFail();
 
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('piezas.show', $pieza))
+        $this->actingAs($this->usuarioConRol('operario'))->get(route('piezas.show', $pieza))
             ->assertOk()
-            ->assertSee('Motor de arranque Denso')
-            ->assertSee('Tipo Arranque')
-            ->assertSee('Fabricante Test S.L.')
-            ->assertSee('Categoría Eléctrica')
-            ->assertSee('89,90 €')
-            ->assertSee('Usada')
-            ->assertSee('Marta Registradora')
-            ->assertDontSee('marta.privada@example.test');
+            ->assertSee('Seat Ibiza')
+            ->assertSee('Electricidad')
+            ->assertSee('Alternador')
+            ->assertSee('Bosch')
+            ->assertSee('Buen estado')
+            ->assertSee($gerente->name)
+            ->assertSee($this->hueco->rutaCompleta())
+            ->assertSee('Historial de movimientos');
     }
 
-    public function test_los_botones_de_la_ficha_dependen_del_permiso(): void
+    public function test_la_ficha_de_una_pieza_archivada_o_inexistente_devuelve_404(): void
     {
-        $pieza = Pieza::factory()->create();
+        $archivada = $this->pieza();
+        $archivada->delete();
+        $usuario = $this->usuarioConRol('operario');
 
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->get(route('piezas.show', $pieza))
-            ->assertDontSee(route('piezas.edit', $pieza, false))
-            ->assertDontSee('value="DELETE"', false);
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('piezas.show', $pieza))
-            ->assertSee(route('piezas.edit', $pieza, false))
-            ->assertDontSee('value="DELETE"', false);
-
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
-            ->get(route('piezas.show', $pieza))
-            ->assertSee(route('piezas.edit', $pieza, false))
-            ->assertSee('value="DELETE"', false);
-    }
-
-    public function test_la_ficha_de_una_pieza_borrada_o_inexistente_devuelve_404(): void
-    {
-        $pieza = Pieza::factory()->create();
-        $pieza->delete();
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE));
-
-        $this->get(route('piezas.show', $pieza->id_pieza))->assertNotFound();
-        $this->get('/piezas/999999')->assertNotFound();
+        $this->actingAs($usuario)->get(route('piezas.show', $archivada))->assertNotFound();
+        $this->actingAs($usuario)->get('/piezas/99999')->assertNotFound();
     }
 
     // ---------- Alta ----------
 
-    public function test_el_formulario_de_alta_no_pide_el_usuario_y_lista_los_tipos(): void
+    public function test_el_formulario_de_alta_pide_los_datos_de_la_pieza_y_su_entrada(): void
     {
-        TipoPieza::factory()->create(['nombre' => 'Tipo Formulario', 'fabricante' => 'Fab Formulario']);
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('piezas.create'))
+        $this->actingAs($this->usuarioConRol('gerente'))->get(route('piezas.create'))
             ->assertOk()
-            ->assertSee('Tipo Formulario (Fab Formulario)')
-            ->assertDontSee('name="id_usuario"', false);
+            ->assertSeeInOrder([
+                'Nombre', 'Marca del vehículo', 'Modelo del vehículo', 'Categoría', 'Tipo de pieza',
+                'Estado físico', 'Precio', 'Stock mínimo', 'Cantidad que ha entrado', 'Ubicación inicial',
+            ])
+            ->assertSee('name="clave_envio"', false)
+            ->assertDontSee('name="id_usuario"', false)
+            ->assertDontSee('name="stock"', false)
+            ->assertSee($this->hueco->rutaCompleta());
     }
 
-    public function test_un_gerente_registra_una_pieza_a_su_nombre(): void
+    public function test_un_gerente_registra_una_pieza_a_su_nombre_con_su_entrada_inicial(): void
     {
-        $tipo = TipoPieza::factory()->create();
         $gerente = $this->usuarioConRol('gerente');
-        $otroUsuario = User::factory()->create();
 
-        $respuesta = $this->actingAs($gerente)
-            ->post(route('piezas.store'), $this->datosPieza($tipo, ['id_usuario' => $otroUsuario->id]));
+        $this->actingAs($gerente)->post(route('piezas.store'), $this->alta())
+            ->assertRedirect()
+            ->assertSessionHas('success');
 
-        $pieza = Pieza::where('nombre', 'Alternador Bosch')->firstOrFail();
-        $respuesta->assertRedirect(route('piezas.show', $pieza))->assertSessionHas('success');
-        $this->assertDatabaseHas('piezas', [
-            'id_pieza' => $pieza->id_pieza,
-            'estado' => 'Usada',
-            'stock' => 4,
-            'stock_minimo' => 2,
-            'id_tipo_pieza' => $tipo->id_pieza,
-            // Se ignora el id_usuario del formulario: manda el usuario autenticado.
-            'id_usuario' => $gerente->id,
-        ]);
-        $this->assertEquals(120.50, (float) $pieza->precio);
+        $pieza = Pieza::firstOrFail();
+        $this->assertSame('Alternador 90A', $pieza->nombre);
+        $this->assertSame($gerente->id, $pieza->id_usuario);
+        $this->assertSame($this->ibiza->id_modelo, $pieza->id_modelo_vehiculo);
+        $this->assertSame(5, $pieza->stock);
+        $this->assertSame(1, Movimiento::where('id_pieza', $pieza->id_pieza)->where('tipo_movimiento', 'entrada')->count());
+    }
+
+    public function test_el_modelo_debe_ser_de_la_marca_y_el_tipo_de_la_categoria(): void
+    {
+        $gerente = $this->usuarioConRol('gerente');
+
+        $this->actingAs($gerente)->post(route('piezas.store'), $this->alta(['id_modelo_vehiculo' => $this->clio->id_modelo]))
+            ->assertSessionHasErrors(['id_modelo_vehiculo' => 'El modelo elegido no corresponde a la marca seleccionada.']);
+
+        $this->actingAs($gerente)->post(route('piezas.store'), $this->alta(['id_tipo_pieza' => $this->puerta->id_pieza]))
+            ->assertSessionHasErrors(['id_tipo_pieza' => 'El tipo de pieza elegido no pertenece a la categoría seleccionada.']);
+
+        $this->assertSame(0, Pieza::count());
+        $this->assertSame(0, Movimiento::count());
+    }
+
+    public function test_el_alta_valida_los_campos_obligatorios_y_los_valores(): void
+    {
+        $gerente = $this->usuarioConRol('gerente');
+
+        $this->actingAs($gerente)->post(route('piezas.store'), [])
+            ->assertSessionHasErrors([
+                'nombre', 'id_marca', 'id_modelo_vehiculo', 'id_categoria', 'id_tipo_pieza', 'estado',
+                'precio', 'stock_minimo', 'cantidad', 'id_etiqueta', 'clave_envio',
+            ]);
+
+        $this->actingAs($gerente)->post(route('piezas.store'), $this->alta([
+            'precio' => -1,
+            'stock_minimo' => 1.5,
+            'cantidad' => 0,
+            'estado' => 'Inventado',
+            'id_tipo_pieza' => 99999,
+            'id_etiqueta' => 99999,
+        ]))->assertSessionHasErrors(['precio', 'stock_minimo', 'cantidad', 'estado', 'id_tipo_pieza', 'id_etiqueta']);
+
+        // El stock y el usuario no se aceptan desde el formulario.
+        $this->actingAs($gerente)->post(route('piezas.store'), $this->alta(['stock' => 50, 'id_usuario' => 1]))
+            ->assertSessionHasErrors(['stock', 'id_usuario']);
+
+        $this->assertSame(0, Pieza::count());
     }
 
     public function test_un_operario_no_puede_registrar_piezas(): void
     {
-        $tipo = TipoPieza::factory()->create();
-        $this->actingAs($this->usuarioConRol('operario'));
+        $operario = $this->usuarioConRol('operario');
 
-        $this->get(route('piezas.create'))->assertForbidden();
-        $this->post(route('piezas.store'), $this->datosPieza($tipo))->assertForbidden();
-        $this->assertDatabaseCount('piezas', 0);
-    }
+        $this->actingAs($operario)->get(route('piezas.create'))->assertForbidden();
+        $this->actingAs($operario)->post(route('piezas.store'), $this->alta())->assertForbidden();
 
-    public function test_el_alta_valida_los_campos_obligatorios(): void
-    {
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->from(route('piezas.create'))
-            ->post(route('piezas.store'), [])
-            ->assertRedirect(route('piezas.create'))
-            ->assertSessionHasErrors(['nombre', 'precio', 'estado', 'stock', 'stock_minimo', 'id_tipo_pieza']);
-
-        $this->assertDatabaseCount('piezas', 0);
-    }
-
-    public function test_el_alta_rechaza_numeros_negativos_decimales_en_stock_y_tipo_inexistente(): void
-    {
-        $tipo = TipoPieza::factory()->create();
-        $this->actingAs($this->usuarioConRol('gerente'));
-
-        $this->post(route('piezas.store'), $this->datosPieza($tipo, ['precio' => '-1']))
-            ->assertSessionHasErrors('precio');
-        $this->post(route('piezas.store'), $this->datosPieza($tipo, ['precio' => 'caro']))
-            ->assertSessionHasErrors('precio');
-        $this->post(route('piezas.store'), $this->datosPieza($tipo, ['stock' => -3]))
-            ->assertSessionHasErrors('stock');
-        $this->post(route('piezas.store'), $this->datosPieza($tipo, ['stock_minimo' => '1.5']))
-            ->assertSessionHasErrors('stock_minimo');
-        $this->post(route('piezas.store'), $this->datosPieza($tipo, ['id_tipo_pieza' => 999999]))
-            ->assertSessionHasErrors('id_tipo_pieza');
-        $this->post(route('piezas.store'), $this->datosPieza($tipo, ['estado' => str_repeat('a', 51)]))
-            ->assertSessionHasErrors('estado');
-        $this->assertDatabaseCount('piezas', 0);
+        $this->assertSame(0, Pieza::count());
     }
 
     // ---------- Edición ----------
 
-    public function test_el_formulario_de_edicion_muestra_los_datos_actuales(): void
+    public function test_el_formulario_de_edicion_muestra_los_datos_actuales_sin_editar_el_stock(): void
     {
-        $pieza = Pieza::factory()->create(['nombre' => 'Faro editable', 'precio' => 45.5, 'stock' => 8]);
+        $pieza = $this->pieza(['nombre' => 'Faro antiguo', 'stock' => 6]);
 
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('piezas.edit', $pieza))
+        $this->actingAs($this->usuarioConRol('gerente'))->get(route('piezas.edit', $pieza))
             ->assertOk()
-            ->assertSee('value="Faro editable"', false)
-            ->assertSee('value="45.50"', false)
-            ->assertSee('value="8"', false);
+            ->assertSee('value="Faro antiguo"', false)
+            ->assertSee('6 unidades')
+            ->assertDontSee('name="stock"', false)
+            ->assertDontSee('name="cantidad"', false);
     }
 
-    public function test_un_gerente_edita_una_pieza_y_se_conserva_quien_la_registro(): void
+    public function test_un_gerente_edita_una_pieza_y_se_conservan_el_stock_y_quien_la_registro(): void
     {
-        $registrador = User::factory()->create();
-        $pieza = Pieza::factory()->create(['nombre' => 'Nombre antiguo', 'id_usuario' => $registrador->id]);
+        $pieza = $this->pieza(['stock' => 6]);
+        $registrador = $pieza->id_usuario;
+
+        $this->actingAs($this->usuarioConRol('gerente'))->put(route('piezas.update', $pieza), [
+            'nombre' => 'Puerta delantera',
+            'id_marca' => $this->clio->id_marca,
+            'id_modelo_vehiculo' => $this->clio->id_modelo,
+            'id_categoria' => $this->carroceria->categoria_id,
+            'id_tipo_pieza' => $this->puerta->id_pieza,
+            'estado' => 'Pendiente de revisar',
+            'precio' => 40,
+            'stock_minimo' => 3,
+        ])->assertRedirect(route('piezas.show', $pieza))->assertSessionHas('success');
+
+        $pieza->refresh();
+        $this->assertSame('Puerta delantera', $pieza->nombre);
+        $this->assertSame($this->clio->id_modelo, $pieza->id_modelo_vehiculo);
+        $this->assertSame('Pendiente de revisar', $pieza->estado);
+        $this->assertSame(6, $pieza->stock);
+        $this->assertSame($registrador, $pieza->id_usuario);
+    }
+
+    public function test_la_edicion_conserva_un_estado_antiguo_y_rechaza_el_stock(): void
+    {
+        $pieza = $this->pieza(['estado' => 'Reacondicionada', 'stock' => 4]);
+        $datos = [
+            'nombre' => 'Faro',
+            'id_marca' => $this->ibiza->id_marca,
+            'id_modelo_vehiculo' => $this->ibiza->id_modelo,
+            'id_categoria' => $this->electricidad->categoria_id,
+            'id_tipo_pieza' => $this->alternador->id_pieza,
+            'estado' => 'Reacondicionada',
+            'precio' => 10,
+            'stock_minimo' => 1,
+        ];
         $gerente = $this->usuarioConRol('gerente');
 
-        $this->actingAs($gerente)
-            ->put(route('piezas.update', $pieza), $this->datosPieza(
-                TipoPieza::find($pieza->id_tipo_pieza),
-                ['nombre' => 'Nombre nuevo', 'stock' => 0, 'id_usuario' => $gerente->id],
-            ))
-            ->assertRedirect(route('piezas.show', $pieza))
-            ->assertSessionHas('success');
+        $this->actingAs($gerente)->put(route('piezas.update', $pieza), $datos)->assertSessionHasNoErrors();
+        $this->actingAs($gerente)->put(route('piezas.update', $pieza), ['stock' => 99] + $datos)->assertSessionHasErrors('stock');
 
-        $this->assertDatabaseHas('piezas', [
-            'id_pieza' => $pieza->id_pieza,
-            'nombre' => 'Nombre nuevo',
-            'stock' => 0,
-            'id_usuario' => $registrador->id,
-        ]);
-    }
-
-    public function test_la_edicion_valida_los_datos(): void
-    {
-        $pieza = Pieza::factory()->create(['nombre' => 'Sin cambios']);
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->put(route('piezas.update', $pieza), $this->datosPieza(TipoPieza::find($pieza->id_tipo_pieza), ['nombre' => '', 'stock' => -1]))
-            ->assertSessionHasErrors(['nombre', 'stock']);
-
-        $this->assertDatabaseHas('piezas', ['id_pieza' => $pieza->id_pieza, 'nombre' => 'Sin cambios']);
+        $this->assertSame(4, $pieza->fresh()->stock);
+        $this->assertSame('Reacondicionada', $pieza->fresh()->estado);
     }
 
     public function test_un_operario_no_puede_editar_piezas(): void
     {
-        $pieza = Pieza::factory()->create(['nombre' => 'Original']);
-        $this->actingAs($this->usuarioConRol('operario'));
+        $pieza = $this->pieza(['nombre' => 'Original']);
+        $operario = $this->usuarioConRol('operario');
 
-        $this->get(route('piezas.edit', $pieza))->assertForbidden();
-        $this->put(route('piezas.update', $pieza), $this->datosPieza(TipoPieza::find($pieza->id_tipo_pieza), ['nombre' => 'Cambiado']))
-            ->assertForbidden();
-        $this->assertDatabaseHas('piezas', ['id_pieza' => $pieza->id_pieza, 'nombre' => 'Original']);
-    }
+        $this->actingAs($operario)->get(route('piezas.edit', $pieza))->assertForbidden();
+        $this->actingAs($operario)->put(route('piezas.update', $pieza), ['nombre' => 'Cambiado'])->assertForbidden();
 
-    // ---------- Baja ----------
-
-    public function test_un_administrador_elimina_una_pieza_con_borrado_logico(): void
-    {
-        $pieza = Pieza::factory()->create();
-
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
-            ->delete(route('piezas.destroy', $pieza))
-            ->assertRedirect(route('piezas.index'))
-            ->assertSessionHas('success');
-
-        $this->assertSoftDeleted('piezas', ['id_pieza' => $pieza->id_pieza]);
-    }
-
-    public function test_ni_el_operario_ni_el_gerente_pueden_eliminar_piezas(): void
-    {
-        $pieza = Pieza::factory()->create();
-
-        $this->actingAs($this->usuarioConRol('operario'))
-            ->delete(route('piezas.destroy', $pieza))
-            ->assertForbidden();
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->delete(route('piezas.destroy', $pieza))
-            ->assertForbidden();
-
-        $this->assertNotSoftDeleted('piezas', ['id_pieza' => $pieza->id_pieza]);
+        $this->assertSame('Original', $pieza->fresh()->nombre);
     }
 }

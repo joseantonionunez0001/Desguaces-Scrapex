@@ -7,6 +7,8 @@ use App\Models\Desguace;
 use App\Models\Estanteria;
 use App\Models\Etiqueta;
 use App\Models\Fila;
+use App\Models\Marca;
+use App\Models\ModeloVehiculo;
 use App\Models\Modulo;
 use App\Models\Movimiento;
 use App\Models\Nivel;
@@ -129,6 +131,30 @@ trait PreparaAutorizacion
             'modulo', 'pasillo', 'estanteria', 'etiqueta', 'patio', 'sector', 'fila', 'posicion', 'nivel', 'ubicacion',
             'vehiculo', 'categoria', 'tipo', 'autor', 'pieza', 'movimiento'
         );
+    }
+
+    /**
+     * Hueco del almacén interior (módulo > pasillo > estantería > etiqueta) en la sede indicada
+     * o en la sede por defecto.
+     */
+    protected function hueco(string $etiqueta = 'A-01', ?Desguace $sede = null, string $modulo = 'Módulo A'): Etiqueta
+    {
+        $idDesguace = $sede?->id_desguace ?? DesguaceFactory::idPorDefecto();
+        $moduloCreado = Modulo::query()->withoutGlobalScopes()->firstOrCreate(
+            ['id_desguace' => $idDesguace, 'nombre_modulo' => $modulo],
+        );
+        $pasillo = Pasillo::factory()->create(['id_modulo' => $moduloCreado->id_modulo, 'numero_pasillo' => '1']);
+        $estanteria = Estanteria::factory()->create(['id_pasillo' => $pasillo->id_pasillo, 'numero_estanteria' => '2']);
+
+        return Etiqueta::factory()->create(['id_estanteria' => $estanteria->id_estanteria, 'numero_etiqueta' => $etiqueta]);
+    }
+
+    /**
+     * Modelo de vehículo del catálogo común (con su marca).
+     */
+    protected function modeloDeVehiculo(string $marca = 'Seat', string $modelo = 'Ibiza'): ModeloVehiculo
+    {
+        return Marca::registrarModelo($marca, $modelo);
     }
 
     // Datos validos para crear un vehiculo en una sede.

@@ -60,7 +60,8 @@ class DashboardController extends Controller
             $indicadores['piezas'] = [
                 'total' => Pieza::count(),
                 'unidades' => (int) Pieza::sum('stock'),
-                'stock_bajo' => Pieza::whereColumn('stock', '<=', 'stock_minimo')->count(),
+                // Mismas reglas que la disponibilidad de la pieza: con unidades y saldo igual o inferior al mínimo.
+                'stock_bajo' => Pieza::query()->conDisponibilidad(Pieza::STOCK_BAJO)->count(),
                 'valor' => (float) (Pieza::selectRaw('COALESCE(SUM(precio * stock), 0) as valor')->value('valor') ?? 0),
             ];
         }

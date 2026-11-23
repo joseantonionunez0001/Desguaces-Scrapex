@@ -40,14 +40,14 @@ class CategoriaApiController extends Controller
         $datos = $request->validate([
             'nombre' => 'required|string|max:255',
             'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
-            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
+            'id_modulo' => ['nullable', new ExisteEnMiSede(Modulo::class)],
             'id_vehiculo' => ['nullable', new ExisteEnMiSede(Vehiculo::class)],
         ]);
 
         $categoria = new Categoria;
         $categoria->nombre = $datos['nombre'];
         $categoria->id_desguace = $datos['id_desguace'];
-        $categoria->id_modulo = $datos['id_modulo'];
+        $categoria->id_modulo = $datos['id_modulo'] ?? null;
         $categoria->id_vehiculo = $datos['id_vehiculo'] ?? null;
         $categoria->save();
 
@@ -65,13 +65,13 @@ class CategoriaApiController extends Controller
         $datos = $request->validate([
             'nombre' => 'required|string|max:255',
             'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
-            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
+            'id_modulo' => ['nullable', new ExisteEnMiSede(Modulo::class)],
             'id_vehiculo' => ['nullable', new ExisteEnMiSede(Vehiculo::class)],
         ]);
 
         $categoria->nombre = $datos['nombre'];
         $categoria->id_desguace = $datos['id_desguace'];
-        $categoria->id_modulo = $datos['id_modulo'];
+        $categoria->id_modulo = $datos['id_modulo'] ?? null;
         $categoria->id_vehiculo = $datos['id_vehiculo'] ?? null;
         $categoria->save();
 

@@ -4,50 +4,58 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\GuardarPiezaRequest;
+use App\Models\Etiqueta;
+use App\Models\ExistenciaPieza;
+use App\Models\Movimiento;
 use App\Models\Pieza;
-use App\Models\TipoPieza;
+use App\Services\InventarioPiezas;
+use App\Support\OpcionesInventario;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
+/**
+ * Catálogo de piezas: listado con filtros combinables, alta con Entrada inicial, ficha con existencias
+ * por hueco e historial, y edición de los datos descriptivos. El stock solo cambia con movimientos.
+ */
 class PiezaController extends Controller
 {
-    /**
-     * Listado con buscador, filtros y paginación.
-     */
     public function index(Request $request): View
     {
         // Los filtros no válidos se descartan sin error.
         $filtros = Validator::make($request->query(), [
             'q' => ['nullable', 'string', 'max:100'],
+            'marca' => ['nullable', 'integer', 'min:1'],
+            'modelo' => ['nullable', 'integer', 'min:1'],
+            'categoria' => ['nullable', 'integer', 'min:1'],
             'tipo' => ['nullable', 'integer', 'min:1'],
             'estado' => ['nullable', 'string', 'max:50'],
-            'disponibilidad' => ['nullable', 'in:disponible,agotada,stock_bajo'],
+            'disponibilidad' => ['nullable', 'in:'.implode(',', array_keys(Pieza::DISPONIBILIDADES))],
         ])->valid();
 
         $piezas = Pieza::query()
-            ->with(['tipoPieza' => fn ($consulta) => $consulta->withTrashed()])
+            ->with([
+                'tipoPieza' => fn ($consulta) => $consulta->withTrashed(),
+                'tipoPieza.categoriaRelacionada' => fn ($consulta) => $consulta->withTrashed(),
+                'modeloVehiculo.marca',
+            ])
             ->when($filtros['q'] ?? null, fn ($consulta, string $texto) => $consulta->where('nombre', 'like', '%'.trim($texto).'%'))
+            ->when($filtros['marca'] ?? null, fn ($consulta, $idMarca) => $consulta->whereHas('modeloVehiculo', fn ($modelo) => $modelo->where('id_marca', $idMarca)))
+            ->when($filtros['modelo'] ?? null, fn ($consulta, $idModelo) => $consulta->where('id_modelo_vehiculo', $idModelo))
+            ->when($filtros['categoria'] ?? null, fn ($consulta, $idCategoria) => $consulta->whereHas('tipoPieza', fn ($tipo) => $tipo->where('id_categoria', $idCategoria)))
             ->when($filtros['tipo'] ?? null, fn ($consulta, $idTipo) => $consulta->where('id_tipo_pieza', $idTipo))
             ->when($filtros['estado'] ?? null, fn ($consulta, string $estado) => $consulta->where('estado', $estado))
-            ->when($filtros['disponibilidad'] ?? null, function ($consulta, string $disponibilidad): void {
-                match ($disponibilidad) {
-                    'disponible' => $consulta->where('stock', '>', 0),
-                    'agotada' => $consulta->where('stock', '<=', 0),
-                    'stock_bajo' => $consulta->whereColumn('stock', '<=', 'stock_minimo'),
-                };
-            })
+            ->when($filtros['disponibilidad'] ?? null, fn ($consulta, string $disponibilidad) => $consulta->conDisponibilidad($disponibilidad))
             ->orderByDesc('id_pieza')
             ->paginate(15)
             ->withQueryString();
 
         return view('piezas.index', [
             'piezas' => $piezas,
-            'filtros' => $filtros,
-            'tiposPieza' => $this->opcionesTipoPieza(),
-            'estados' => $this->opcionesEstado(),
+            'filtros' => array_filter($filtros, fn ($valor) => filled($valor)),
+            ...$this->opcionesDeFormulario(),
         ]);
     }
 
@@ -55,53 +63,85 @@ class PiezaController extends Controller
     {
         return view('piezas.create', [
             'pieza' => new Pieza,
-            'tiposPieza' => $this->opcionesTipoPieza(),
-            'estados' => $this->opcionesEstado(),
+            'claveEnvio' => (string) Str::uuid(),
+            ...$this->opcionesDeFormulario(),
         ]);
     }
 
-    public function store(GuardarPiezaRequest $request): RedirectResponse
+    /**
+     * Alta de la pieza y su Entrada inicial en una sola transacción (InventarioPiezas::darDeAlta).
+     * Un reenvío del mismo formulario no duplica la pieza: devuelve la ya registrada.
+     */
+    public function store(GuardarPiezaRequest $request, InventarioPiezas $inventario): RedirectResponse
     {
-        $pieza = new Pieza;
-        $pieza->fill($request->validated());
-        // El registrador es siempre el usuario autenticado, nunca un dato del formulario.
-        $pieza->id_usuario = $request->user()->getKey();
-        $pieza->save();
+        $pieza = $inventario->darDeAlta(
+            $request->datosDeLaPieza(),
+            (int) $request->validated('cantidad'),
+            (int) $request->validated('id_etiqueta'),
+            $request->user(),
+            $request->validated('clave_envio'),
+        );
 
         return redirect()
             ->route('piezas.show', $pieza)
-            ->with('success', 'Pieza registrada correctamente.');
+            ->with('success', 'Pieza registrada correctamente con su entrada inicial.');
     }
 
-    /**
-     * Ficha de la pieza con su tipo, la categoría del tipo y el usuario que la registró.
-     */
     public function show(Pieza $pieza): View
     {
         $pieza->load([
             'tipoPieza' => fn ($consulta) => $consulta->withTrashed(),
             'tipoPieza.categoriaRelacionada' => fn ($consulta) => $consulta->withTrashed(),
+            'modeloVehiculo.marca',
             'usuario' => fn ($consulta) => $consulta->withTrashed(),
         ]);
 
-        return view('piezas.show', ['pieza' => $pieza]);
+        $existencias = ExistenciaPieza::query()
+            ->where('id_pieza', $pieza->getKey())
+            ->where('cantidad', '>', 0)
+            ->with(['etiqueta' => fn ($consulta) => $consulta->withTrashed(), ...Etiqueta::relacionesDeRuta('etiqueta.')])
+            // El stock pendiente de ubicar aparece el último.
+            ->orderByRaw('id_etiqueta is null')
+            ->orderBy('id_etiqueta')
+            ->get();
+
+        $historial = Movimiento::query()
+            ->where('id_pieza', $pieza->getKey())
+            ->with([
+                'usuario' => fn ($consulta) => $consulta->withTrashed(),
+                'origen' => fn ($consulta) => $consulta->withTrashed(),
+                'destino' => fn ($consulta) => $consulta->withTrashed(),
+                ...Etiqueta::relacionesDeRuta('origen.'),
+                ...Etiqueta::relacionesDeRuta('destino.'),
+            ])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id_movimiento')
+            ->paginate(15, ['*'], 'historial')
+            ->withQueryString();
+
+        return view('piezas.show', [
+            'pieza' => $pieza,
+            'existencias' => $existencias,
+            'historial' => $historial,
+        ]);
     }
 
     public function edit(Pieza $pieza): View
     {
+        $pieza->load(['modeloVehiculo', 'tipoPieza']);
+
         return view('piezas.edit', [
             'pieza' => $pieza,
-            'tiposPieza' => $this->opcionesTipoPieza(),
-            'estados' => $this->opcionesEstado(),
+            ...$this->opcionesDeFormulario(),
         ]);
     }
 
     /**
-     * Actualiza la pieza conservando el usuario que la registró.
+     * Solo datos descriptivos: el stock no se edita aquí, se registra con movimientos.
      */
     public function update(GuardarPiezaRequest $request, Pieza $pieza): RedirectResponse
     {
-        $pieza->fill($request->validated())->save();
+        $pieza->fill($request->datosDeLaPieza())->save();
 
         return redirect()
             ->route('piezas.show', $pieza)
@@ -109,41 +149,23 @@ class PiezaController extends Controller
     }
 
     /**
-     * Borrado lógico, igual que en la API.
+     * @return array<string, mixed>
      */
-    public function destroy(Pieza $pieza): RedirectResponse
+    private function opcionesDeFormulario(): array
     {
-        $pieza->delete();
+        $modelos = OpcionesInventario::modelos();
+        $tipos = OpcionesInventario::tipos();
 
-        return redirect()
-            ->route('piezas.index')
-            ->with('success', 'Pieza eliminada correctamente.');
-    }
-
-    /**
-     * @return Collection<int, string> "nombre (fabricante)" de cada tipo indexado por su id
-     */
-    private function opcionesTipoPieza()
-    {
-        return TipoPieza::query()
-            ->orderBy('nombre')
-            ->orderBy('fabricante')
-            ->get(['id_pieza', 'nombre', 'fabricante'])
-            ->mapWithKeys(fn (TipoPieza $tipo): array => [$tipo->id_pieza => $tipo->nombre.' ('.$tipo->fabricante.')']);
-    }
-
-    /**
-     * Estados que existen realmente en la base de datos.
-     *
-     * @return Collection<string, string>
-     */
-    private function opcionesEstado()
-    {
-        return Pieza::query()
-            ->whereNotNull('estado')
-            ->distinct()
-            ->orderBy('estado')
-            ->pluck('estado')
-            ->mapWithKeys(fn (string $estado): array => [$estado => $estado]);
+        return [
+            'marcas' => OpcionesInventario::marcas(),
+            'modelos' => $modelos['opciones'],
+            'marcaDeCadaModelo' => $modelos['padres'],
+            'categorias' => OpcionesInventario::categorias(),
+            'tiposPieza' => $tipos['opciones'],
+            'categoriaDeCadaTipo' => $tipos['padres'],
+            'estados' => OpcionesInventario::estadosFisicos(),
+            'huecos' => OpcionesInventario::huecos(),
+            'disponibilidades' => Pieza::DISPONIBILIDADES,
+        ];
     }
 }

@@ -4,16 +4,18 @@ namespace Tests\Feature\Web;
 
 use App\Models\Categoria;
 use App\Models\Desguace;
-use App\Models\Modulo;
 use App\Models\Movimiento;
 use App\Models\TipoPieza;
-use App\Models\Vehiculo;
 use Database\Factories\DesguaceFactory;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
 
+/**
+ * Pantalla de categorías: alta y listado. Solo se pide el nombre; el desguace lo asigna el servidor.
+ * Los tipos se crean en «Tipos de pieza» y las piezas en «Piezas».
+ */
 class CategoriasWebTest extends TestCase
 {
     use PreparaAutorizacion, RefreshDatabase;
@@ -24,33 +26,9 @@ class CategoriasWebTest extends TestCase
         $this->prepararRoles();
     }
 
-    private function categoriaCoherente(array $atributos = [], string $desguace = 'Desguace Norte', string $modulo = 'Módulo A'): Categoria
+    private function categoria(string $nombre = 'Motor'): Categoria
     {
-        // Las categorías se crean en la sede de las cuentas de prueba (la sede por defecto).
-        $desguaceCreado = Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
-        $desguaceCreado->update(['nombre' => $desguace]);
-        $moduloCreado = Modulo::factory()->create(['id_desguace' => $desguaceCreado->id_desguace, 'nombre_modulo' => $modulo]);
-
-        return Categoria::factory()->create($atributos + [
-            'id_desguace' => $desguaceCreado->id_desguace,
-            'id_modulo' => $moduloCreado->id_modulo,
-        ]);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function datosValidos(?Desguace $desguace = null): array
-    {
-        $desguace ??= Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
-        $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
-
-        return [
-            'nombre' => 'Transmisión',
-            'id_desguace' => $desguace->id_desguace,
-            'id_modulo' => $modulo->id_modulo,
-            'id_vehiculo' => '',
-        ];
+        return Categoria::factory()->create(['nombre' => $nombre, 'id_modulo' => null]);
     }
 
     public function test_invitado_es_redirigido_al_login(): void
@@ -59,38 +37,51 @@ class CategoriasWebTest extends TestCase
         $this->post(route('categorias.store'), [])->assertRedirect(route('login'));
     }
 
-    public function test_usuario_sin_rol_recibe_403(): void
+    public function test_usuario_sin_rol_y_operario_reciben_403(): void
     {
-        $usuario = $this->usuarioConRol();
-        $categoria = $this->categoriaCoherente();
+        $categoria = $this->categoria();
 
-        $this->actingAs($usuario)->get(route('categorias.index'))->assertForbidden();
-        $this->actingAs($usuario)->post(route('categorias.store'), $this->datosValidos())->assertForbidden();
-        $this->actingAs($usuario)->put(route('categorias.update', $categoria), $this->datosValidos())->assertForbidden();
-        $this->actingAs($usuario)->delete(route('categorias.destroy', $categoria))->assertForbidden();
+        foreach ([null, RoleSeeder::OPERARIO] as $rol) {
+            $usuario = $this->usuarioConRol($rol);
+
+            $this->actingAs($usuario)->get(route('categorias.index'))->assertForbidden();
+            $this->actingAs($usuario)->post(route('categorias.store'), ['nombre' => 'Nueva'])->assertForbidden();
+            $this->actingAs($usuario)->put(route('categorias.update', $categoria), ['nombre' => 'Otra'])->assertForbidden();
+            $this->actingAs($usuario)->delete(route('categorias.destroy', $categoria))->assertForbidden();
+        }
+
+        $this->assertSame('Motor', $categoria->fresh()->nombre);
     }
 
-    public function test_todos_los_roles_ven_las_categorias_con_sus_relaciones_y_contadores(): void
+    public function test_el_listado_muestra_las_categorias_con_sus_contadores(): void
     {
-        $vehiculo = Vehiculo::factory()->create(['matricula' => '1234BCD']);
-        $categoria = $this->categoriaCoherente(['nombre' => 'Suspensión', 'id_vehiculo' => $vehiculo->id_vehiculo], 'Desguace Levante', 'Módulo Q');
+        $categoria = $this->categoria('Electricidad');
         TipoPieza::factory()->count(2)->create(['id_categoria' => $categoria->categoria_id]);
         Movimiento::factory()->count(3)->create(['id_categoria' => $categoria->categoria_id]);
-
-        // Categorías es un módulo de gestión: el operario no entra.
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))->assertForbidden();
 
         foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
             $this->actingAs($this->usuarioConRol($rol))
                 ->get(route('categorias.index'))
                 ->assertOk()
-                ->assertSee('Suspensión')
-                ->assertSee('Desguace Levante')
-                ->assertSee('Módulo Q')
-                ->assertSee('1234BCD')
+                ->assertSee('Electricidad')
                 ->assertViewHas('categorias', fn ($categorias) => $categorias->first()->tipos_pieza_count === 2
                     && $categorias->first()->movimientos_count === 3);
         }
+    }
+
+    public function test_la_pantalla_ya_no_crea_tipos_ni_piezas(): void
+    {
+        $categoria = $this->categoria();
+        TipoPieza::factory()->create(['id_categoria' => $categoria->categoria_id]);
+
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get(route('categorias.index'))
+            ->assertOk()
+            ->assertDontSee('action="'.route('tipos-pieza.store').'"', false)
+            ->assertDontSee('action="'.route('piezas.store').'"', false)
+            ->assertDontSee('name="id_tipo_pieza"', false)
+            ->assertDontSee('name="id_modulo"', false)
+            ->assertDontSee('name="id_desguace"', false)
+            ->assertSee(route('tipos-pieza.index', ['categoria' => $categoria->categoria_id]), false);
     }
 
     public function test_estado_vacio(): void
@@ -102,25 +93,19 @@ class CategoriasWebTest extends TestCase
             ->assertSee('Nueva categoría');
     }
 
-    public function test_buscador_y_filtro_por_desguace(): void
+    public function test_buscador_y_categorias_de_otra_sede(): void
     {
-        $this->categoriaCoherente(['nombre' => 'Motor'], 'Desguace Norte', 'Módulo A');
-        $frenos = $this->categoriaCoherente(['nombre' => 'Frenos'], 'Desguace Sur', 'Módulo B');
-        $otraSede = Desguace::factory()->create();
+        $this->categoria('Motor');
+        $this->categoria('Frenos');
+        Categoria::factory()->create(['nombre' => 'Frenos de otra sede', 'id_desguace' => Desguace::factory()->create()->id_desguace, 'id_modulo' => null]);
         $usuario = $this->usuarioConRol('gerente');
 
-        $this->actingAs($usuario)->get(route('categorias.index', ['q' => 'Frenos']))
+        $this->actingAs($usuario)->get(route('categorias.index'))
+            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 2)
+            ->assertDontSee('Frenos de otra sede');
+
+        $this->actingAs($usuario)->get(route('categorias.index', ['q' => 'Fren']))
             ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 1);
-
-        $this->actingAs($usuario)->get(route('categorias.index', ['q' => 'Módulo B']))
-            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 1
-                && $categorias->first()->categoria_id === $frenos->categoria_id);
-
-        // El filtro por desguace solo puede devolver datos de la sede propia.
-        $this->actingAs($usuario)->get(route('categorias.index', ['desguace' => $frenos->id_desguace]))
-            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 2);
-        $this->actingAs($usuario)->get(route('categorias.index', ['desguace' => $otraSede->id_desguace]))
-            ->assertViewHas('categorias', fn ($categorias) => $categorias->total() === 0);
 
         $this->actingAs($usuario)->get(route('categorias.index', ['q' => 'no-existe']))
             ->assertOk()
@@ -129,25 +114,22 @@ class CategoriasWebTest extends TestCase
 
     public function test_el_listado_se_pagina(): void
     {
-        $desguace = Desguace::factory()->create();
-        $modulo = Modulo::factory()->create(['id_desguace' => $desguace->id_desguace]);
-        Categoria::factory()->count(16)->create(['id_desguace' => $desguace->id_desguace, 'id_modulo' => $modulo->id_modulo]);
+        foreach (range(1, 16) as $numero) {
+            $this->categoria("Categoría {$numero}");
+        }
 
         $this->actingAs($this->usuarioConRol('gerente'))
             ->get(route('categorias.index', ['page' => 2]))
             ->assertViewHas('categorias', fn ($categorias) => $categorias->count() === 1 && $categorias->total() === 16);
     }
 
-    public function test_el_operario_no_ve_acciones_de_edicion_y_el_gerente_no_ve_eliminar(): void
+    public function test_los_botones_dependen_del_permiso(): void
     {
-        $categoria = $this->categoriaCoherente();
+        $categoria = $this->categoria();
         $botonDeEdicion = 'data-modal-open="editar-categoria-'.$categoria->categoria_id.'"';
         $formularioDeBorrado = 'name="_method" value="DELETE"';
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('categorias.index'))->assertForbidden();
-
         $this->actingAs($this->usuarioConRol('gerente'))->get(route('categorias.index'))
-            ->assertOk()
             ->assertSee('Nueva categoría')
             ->assertSee($botonDeEdicion, false)
             ->assertDontSee($formularioDeBorrado, false);
@@ -157,139 +139,86 @@ class CategoriasWebTest extends TestCase
             ->assertSee($formularioDeBorrado, false);
     }
 
-    public function test_el_operario_no_puede_crear_editar_ni_eliminar(): void
+    public function test_gerente_y_administrador_crean_categorias_solo_con_el_nombre(): void
     {
-        $categoria = $this->categoriaCoherente(['nombre' => 'Original']);
-        $operario = $this->usuarioConRol('operario');
-
-        $this->actingAs($operario)->post(route('categorias.store'), $this->datosValidos())->assertForbidden();
-        $this->actingAs($operario)->put(route('categorias.update', $categoria), $this->datosValidos())->assertForbidden();
-        $this->actingAs($operario)->delete(route('categorias.destroy', $categoria))->assertForbidden();
-
-        $this->assertDatabaseCount('categorias', 1);
-        $this->assertSame('Original', $categoria->fresh()->nombre);
-    }
-
-    public function test_gerente_y_administrador_crean_categorias(): void
-    {
-        foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
+        foreach (['Electricidad' => 'gerente', 'Carrocería' => RoleSeeder::ADMIN_DESGUACE] as $nombre => $rol) {
             $this->actingAs($this->usuarioConRol($rol))
-                ->post(route('categorias.store'), $this->datosValidos())
+                ->post(route('categorias.store'), ['nombre' => $nombre])
                 ->assertRedirect(route('categorias.index'))
                 ->assertSessionHas('success');
         }
 
-        $this->assertDatabaseCount('categorias', 2);
-        $this->assertDatabaseHas('categorias', ['nombre' => 'Transmisión', 'id_vehiculo' => null]);
+        // El desguace lo asigna el servidor; el módulo ya no es obligatorio.
+        $sede = DesguaceFactory::idPorDefecto();
+        $this->assertDatabaseHas('categorias', ['nombre' => 'Electricidad', 'id_desguace' => $sede, 'id_modulo' => null]);
+        $this->assertDatabaseHas('categorias', ['nombre' => 'Carrocería', 'id_desguace' => $sede, 'id_modulo' => null]);
     }
 
     public function test_crear_una_categoria_muestra_el_aviso_flotante_en_la_pagina_siguiente(): void
     {
         $this->actingAs($this->usuarioConRol('gerente'))
             ->followingRedirects()
-            ->post(route('categorias.store'), $this->datosValidos())
+            ->post(route('categorias.store'), ['nombre' => 'Motor'])
             ->assertOk()
             ->assertSee('window.flasher?.success', false)
             ->assertSee('correctamente', false);
     }
 
-    public function test_se_puede_asociar_un_vehiculo_y_quitarlo_al_editar(): void
+    public function test_no_se_acepta_otra_sede_ni_un_nombre_repetido_o_vacio(): void
     {
-        $categoria = $this->categoriaCoherente();
-        $vehiculo = Vehiculo::factory()->create();
-        $datos = [
-            'nombre' => 'Motor',
-            'id_desguace' => $categoria->id_desguace,
-            'id_modulo' => $categoria->id_modulo,
-            'id_vehiculo' => $vehiculo->id_vehiculo,
-        ];
         $gerente = $this->usuarioConRol('gerente');
+        $this->categoria('Motor');
 
-        $this->actingAs($gerente)->put(route('categorias.update', $categoria), $datos)
-            ->assertRedirect(route('categorias.index'));
-        $this->assertSame($vehiculo->id_vehiculo, $categoria->fresh()->id_vehiculo);
-
-        $this->actingAs($gerente)->put(route('categorias.update', $categoria), ['id_vehiculo' => ''] + $datos)
-            ->assertRedirect(route('categorias.index'));
-        $this->assertNull($categoria->fresh()->id_vehiculo);
-    }
-
-    public function test_gerente_edita_una_categoria(): void
-    {
-        $categoria = $this->categoriaCoherente(['nombre' => 'Original']);
-        $datos = ['nombre' => 'Renombrada', 'id_desguace' => $categoria->id_desguace, 'id_modulo' => $categoria->id_modulo, 'id_vehiculo' => ''];
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->put(route('categorias.update', $categoria), $datos)
-            ->assertRedirect(route('categorias.index'))
-            ->assertSessionHas('success');
-
-        $this->assertDatabaseHas('categorias', ['categoria_id' => $categoria->categoria_id, 'nombre' => 'Renombrada']);
-    }
-
-    public function test_validacion_de_campos_obligatorios_y_reapertura_del_modal(): void
-    {
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->from(route('categorias.index'))
-            ->post(route('categorias.store'), ['_modal' => 'crear-categoria'])
-            ->assertRedirect(route('categorias.index'))
-            ->assertSessionHasErrors(['nombre', 'id_desguace', 'id_modulo'])
+        $this->actingAs($gerente)->post(route('categorias.store'), ['nombre' => 'Frenos', 'id_desguace' => Desguace::factory()->create()->id_desguace])
+            ->assertSessionHasErrors('id_desguace');
+        $this->actingAs($gerente)->post(route('categorias.store'), ['nombre' => 'Motor'])
+            ->assertSessionHasErrors(['nombre' => 'Ya existe una categoría con ese nombre en tu desguace.']);
+        $this->actingAs($gerente)->post(route('categorias.store'), ['nombre' => '', '_modal' => 'crear-categoria'])
+            ->assertSessionHasErrors('nombre')
             ->assertSessionHasInput('_modal', 'crear-categoria');
+        $this->actingAs($gerente)->post(route('categorias.store'), ['nombre' => str_repeat('a', 256)])
+            ->assertSessionHasErrors('nombre');
 
-        $this->assertDatabaseCount('categorias', 0);
+        $this->assertSame(1, Categoria::count());
+    }
+
+    public function test_el_mismo_nombre_puede_existir_en_otra_sede(): void
+    {
+        // El gerente se crea primero: su sede es la sede por defecto y la otra es distinta.
+        $gerente = $this->usuarioConRol('gerente');
+        Categoria::factory()->create(['nombre' => 'Motor', 'id_desguace' => Desguace::factory()->create()->id_desguace, 'id_modulo' => null]);
+
+        $this->actingAs($gerente)
+            ->post(route('categorias.store'), ['nombre' => 'Motor'])
+            ->assertSessionHasNoErrors();
     }
 
     public function test_el_modal_se_reabre_con_los_errores_al_volver_al_listado(): void
     {
-        $this->withSession(['_old_input' => ['_modal' => 'crear-categoria']])
-            ->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('categorias.index'))
+        $this->actingAs($this->usuarioConRol('gerente'))
+            ->from(route('categorias.index'))
+            ->followingRedirects()
+            ->post(route('categorias.store'), ['nombre' => '', '_modal' => 'crear-categoria'])
             ->assertOk()
+            ->assertSee('id="crear-categoria"', false)
             ->assertSee('data-open-on-load', false);
     }
 
-    public function test_validacion_de_valores_inexistentes_y_longitud(): void
+    public function test_gerente_edita_una_categoria_sin_cambiar_su_sede(): void
     {
+        $categoria = $this->categoria('Motor');
+
         $this->actingAs($this->usuarioConRol('gerente'))
-            ->post(route('categorias.store'), [
-                'nombre' => str_repeat('a', 256),
-                'id_desguace' => 999999,
-                'id_modulo' => 999999,
-                'id_vehiculo' => 999999,
-            ])
-            ->assertSessionHasErrors(['nombre', 'id_desguace', 'id_modulo', 'id_vehiculo']);
-    }
+            ->put(route('categorias.update', $categoria), ['nombre' => 'Motor y transmisión'])
+            ->assertRedirect(route('categorias.index'));
 
-    public function test_el_modulo_debe_pertenecer_al_desguace_elegido(): void
-    {
-        $desguace = Desguace::factory()->create();
-        $moduloDeOtroDesguace = Modulo::factory()->create(['id_desguace' => Desguace::factory()->create()->id_desguace]);
-        $gerente = $this->usuarioConRol('gerente');
-
-        $this->actingAs($gerente)
-            ->post(route('categorias.store'), [
-                'nombre' => 'Incoherente',
-                'id_desguace' => $desguace->id_desguace,
-                'id_modulo' => $moduloDeOtroDesguace->id_modulo,
-            ])
-            // El módulo es de otra sede: se rechaza antes incluso de comprobar la coherencia.
-            ->assertSessionHasErrors(['id_modulo' => 'El valor seleccionado en módulo no existe o no pertenece a tu desguace.']);
-
-        $categoria = $this->categoriaCoherente();
-        $this->actingAs($gerente)
-            ->put(route('categorias.update', $categoria), [
-                'nombre' => 'Incoherente',
-                'id_desguace' => $categoria->id_desguace,
-                'id_modulo' => $moduloDeOtroDesguace->id_modulo,
-            ])
-            ->assertSessionHasErrors('id_modulo');
-
-        $this->assertDatabaseMissing('categorias', ['nombre' => 'Incoherente']);
+        $this->assertSame('Motor y transmisión', $categoria->fresh()->nombre);
+        $this->assertSame($categoria->id_desguace, $categoria->fresh()->id_desguace);
     }
 
     public function test_solo_el_administrador_elimina_categorias(): void
     {
-        $categoria = $this->categoriaCoherente();
+        $categoria = $this->categoria();
 
         $this->actingAs($this->usuarioConRol('gerente'))->delete(route('categorias.destroy', $categoria))->assertForbidden();
         $this->assertNotSoftDeleted($categoria);
@@ -304,9 +233,9 @@ class CategoriasWebTest extends TestCase
 
     public function test_no_se_elimina_una_categoria_con_tipos_de_pieza_o_movimientos(): void
     {
-        $conTipos = $this->categoriaCoherente();
+        $conTipos = $this->categoria('Con tipos');
         TipoPieza::factory()->create(['id_categoria' => $conTipos->categoria_id]);
-        $conMovimientos = $this->categoriaCoherente();
+        $conMovimientos = $this->categoria('Con movimientos');
         Movimiento::factory()->create(['id_categoria' => $conMovimientos->categoria_id]);
         $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
 

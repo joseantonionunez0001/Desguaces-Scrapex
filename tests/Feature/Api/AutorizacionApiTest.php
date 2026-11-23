@@ -170,17 +170,27 @@ class AutorizacionApiTest extends TestCase
         $gerente = $this->actuarComo(RoleSeeder::GERENTE, $sede);
         $pieza = $inventario['pieza'];
 
-        $this->putJson("/api/piezas/{$pieza->id_pieza}", [
+        $datos = [
             'nombre' => 'Alternador',
             'precio' => 50,
-            'estado' => 'Usada',
-            'stock' => 12,
+            'estado' => 'Buen estado',
             'stock_minimo' => 2,
-            'id_usuario' => $gerente->id,
             'id_tipo_pieza' => $inventario['tipo']->id_pieza,
-        ])->assertOk();
+        ];
+
+        // Los datos descriptivos se editan; el stock no (solo cambia con movimientos).
+        $this->putJson("/api/piezas/{$pieza->id_pieza}", $datos)->assertOk();
+        $this->putJson("/api/piezas/{$pieza->id_pieza}", $datos + ['stock' => 12])->assertStatus(422)->assertJsonValidationErrors('stock');
+
+        $this->postJson('/api/movimientos', [
+            'id_pieza' => $pieza->id_pieza,
+            'accion' => 'compra',
+            'cantidad' => 7,
+            'destino' => $inventario['etiqueta']->id_etiqueta,
+        ])->assertStatus(201);
 
         $this->assertSame(12, $pieza->fresh()->stock);
+        $this->assertSame($gerente->id, $pieza->movimientos()->latest('id_movimiento')->first()->id_usuario);
     }
 
     public function test_gerente_no_puede_gestionar_usuarios_ni_auditoria(): void

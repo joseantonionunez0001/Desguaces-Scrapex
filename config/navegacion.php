@@ -60,6 +60,14 @@ return [
                 'permission' => 'categorias.ver',
                 'active' => ['categorias.*'],
             ],
+            [
+                'label' => 'Tipos de pieza',
+                'descripcion' => 'Tipos de pieza de cada categoría.',
+                'route' => 'tipos-pieza.index',
+                'icon' => 'cog',
+                'permission' => 'tipo_piezas.ver',
+                'active' => ['tipos-pieza.*'],
+            ],
         ],
 
         'Desguaces y almacén' => [

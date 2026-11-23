@@ -37,15 +37,15 @@ class TipoPiezaApiController extends Controller
     {
         $datos = $request->validate([
             'nombre' => 'required|string|max:255',
-            'fabricante' => 'required|string|max:255',
-            'categoria' => 'required|string|max:255',
+            'fabricante' => 'nullable|string|max:255',
+            'categoria' => 'nullable|string|max:255',
             'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ]);
 
         $tipoPieza = new TipoPieza;
         $tipoPieza->nombre = $datos['nombre'];
-        $tipoPieza->fabricante = $datos['fabricante'];
-        $tipoPieza->categoria = $datos['categoria'];
+        $tipoPieza->fabricante = $datos['fabricante'] ?? null;
+        $tipoPieza->categoria = $datos['categoria'] ?? null;
         $tipoPieza->id_categoria = $datos['id_categoria'];
         $tipoPieza->save();
 
@@ -62,14 +62,14 @@ class TipoPiezaApiController extends Controller
 
         $datos = $request->validate([
             'nombre' => 'required|string|max:255',
-            'fabricante' => 'required|string|max:255',
-            'categoria' => 'required|string|max:255',
+            'fabricante' => 'nullable|string|max:255',
+            'categoria' => 'nullable|string|max:255',
             'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
         ]);
 
         $tipoPieza->nombre = $datos['nombre'];
-        $tipoPieza->fabricante = $datos['fabricante'];
-        $tipoPieza->categoria = $datos['categoria'];
+        $tipoPieza->fabricante = $datos['fabricante'] ?? null;
+        $tipoPieza->categoria = $datos['categoria'] ?? null;
         $tipoPieza->id_categoria = $datos['id_categoria'];
         $tipoPieza->save();
 

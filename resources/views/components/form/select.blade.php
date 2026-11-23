@@ -1,6 +1,8 @@
 {{--
     Desplegable. options: array o colección clave => etiqueta (p. ej. $desguaces->pluck('nombre', 'id_desguace')).
     placeholder = null elimina la opción vacía.
+    Desplegable dependiente: padres = [clave => valor del campo padre] y data-depende-de="nombre del campo padre".
+    Al elegir un valor en el campo padre solo se muestran las opciones con ese padre (resources/js/app.js).
 --}}
 @props([
     'name',
@@ -11,6 +13,7 @@
     'hint' => null,
     'required' => false,
     'useOld' => true,
+    'padres' => [],
 ])
 
 @php
@@ -34,7 +37,7 @@
             <option value="">{{ $placeholder }}</option>
         @endif
         @foreach ($options as $clave => $etiqueta)
-            <option value="{{ $clave }}" @selected((string) $clave === $seleccionado)>{{ $etiqueta }}</option>
+            <option value="{{ $clave }}" @selected((string) $clave === $seleccionado) @isset($padres[$clave]) data-padre="{{ $padres[$clave] }}" @endisset>{{ $etiqueta }}</option>
         @endforeach
     </select>
 

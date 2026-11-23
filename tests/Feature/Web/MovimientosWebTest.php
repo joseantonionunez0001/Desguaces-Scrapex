@@ -3,326 +3,254 @@
 namespace Tests\Feature\Web;
 
 use App\Models\Categoria;
-use App\Models\Desguace;
-use App\Models\Modulo;
+use App\Models\Etiqueta;
+use App\Models\ExistenciaPieza;
 use App\Models\Movimiento;
 use App\Models\Pieza;
-use Database\Factories\DesguaceFactory;
+use App\Models\TipoPieza;
+use App\Models\User;
+use App\Services\InventarioPiezas;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
 
+/**
+ * Pantallas web de movimientos: listado del historial con filtros, registro en dos pasos (pieza y acción)
+ * y permisos. Las reglas de existencias se prueban en InventarioPiezasWebTest.
+ */
 class MovimientosWebTest extends TestCase
 {
     use PreparaAutorizacion, RefreshDatabase;
+
+    private Categoria $categoria;
+
+    private Pieza $pieza;
+
+    private Etiqueta $hueco;
+
+    private User $gerente;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->prepararRoles();
+
+        $this->gerente = $this->usuarioConRol(RoleSeeder::GERENTE);
+        $this->hueco = $this->hueco('A-01');
+        $this->categoria = Categoria::factory()->create(['nombre' => 'Motor', 'id_modulo' => null]);
+        $tipo = TipoPieza::factory()->create(['id_categoria' => $this->categoria->categoria_id]);
+        $this->pieza = app(InventarioPiezas::class)->darDeAlta(
+            ['nombre' => 'Radiador', 'precio' => 50, 'estado' => 'Buen estado', 'stock_minimo' => 1, 'id_tipo_pieza' => $tipo->id_pieza],
+            6,
+            $this->hueco->id_etiqueta,
+            $this->gerente,
+            (string) Str::uuid(),
+        );
     }
 
-    private function categoriaCoherente(string $nombre = 'Motor', string $desguace = 'Desguace Norte', string $modulo = 'Módulo A'): Categoria
+    private function registrar(string $accion, array $datos): void
     {
-        // Los datos se crean en la sede de las cuentas de prueba (la sede por defecto).
-        $desguaceCreado = Desguace::query()->withoutGlobalScopes()->findOrFail(DesguaceFactory::idPorDefecto());
-        $desguaceCreado->update(['nombre' => $desguace]);
-        $moduloCreado = Modulo::factory()->create(['id_desguace' => $desguaceCreado->id_desguace, 'nombre_modulo' => $modulo]);
-
-        return Categoria::factory()->create([
-            'nombre' => $nombre,
-            'id_desguace' => $desguaceCreado->id_desguace,
-            'id_modulo' => $moduloCreado->id_modulo,
-        ]);
+        app(InventarioPiezas::class)->registrar($this->pieza->fresh(), $accion, $datos, $this->gerente, (string) Str::uuid());
     }
 
-    /**
-     * @return array<string, string>
-     */
-    private function datosValidos(Categoria $categoria): array
-    {
-        return [
-            'tipo_movimiento' => 'Entrada',
-            'fecha' => '2026-03-10',
-            'cantidad' => '5',
-            'id_categoria' => (string) $categoria->categoria_id,
-        ];
-    }
+    // ---------- Acceso ----------
 
     public function test_invitado_es_redirigido_al_login(): void
     {
         $this->get(route('movimientos.index'))->assertRedirect(route('login'));
         $this->get(route('movimientos.create'))->assertRedirect(route('login'));
-        $this->post(route('movimientos.store'), [])->assertRedirect(route('login'));
+        $this->post(route('movimientos.store', $this->pieza), [])->assertRedirect(route('login'));
     }
 
-    public function test_usuario_sin_rol_recibe_403(): void
+    public function test_usuario_sin_rol_y_operario_reciben_403(): void
     {
-        $usuario = $this->usuarioConRol();
-        $categoria = $this->categoriaCoherente();
+        foreach ([null, RoleSeeder::OPERARIO] as $rol) {
+            $usuario = $this->usuarioConRol($rol);
 
-        $this->actingAs($usuario)->get(route('movimientos.index'))->assertForbidden();
-        $this->actingAs($usuario)->get(route('movimientos.create'))->assertForbidden();
-        $this->actingAs($usuario)->post(route('movimientos.store'), $this->datosValidos($categoria))->assertForbidden();
-        $this->assertDatabaseCount('movimientos', 0);
+            $this->actingAs($usuario)->get(route('movimientos.index'))->assertForbidden();
+            $this->actingAs($usuario)->get(route('movimientos.create'))->assertForbidden();
+            $this->actingAs($usuario)->post(route('movimientos.store', $this->pieza), [
+                'accion' => 'venta', 'cantidad' => 1, 'origen' => (string) $this->hueco->id_etiqueta, 'clave_envio' => (string) Str::uuid(),
+            ])->assertForbidden();
+        }
+
+        $this->assertSame(6, $this->pieza->fresh()->stock);
     }
 
-    public function test_todos_los_roles_ven_el_listado_con_datos_reales(): void
+    public function test_el_historial_no_se_edita_ni_se_borra(): void
     {
-        $categoria = $this->categoriaCoherente('Frenos', 'Desguace Levante');
-        Movimiento::factory()->create([
-            'tipo_movimiento' => 'Salida',
-            'fecha' => '2026-02-01',
-            'cantidad' => 7,
-            'id_categoria' => $categoria->categoria_id,
-        ]);
+        $movimiento = Movimiento::firstOrFail();
+        $administrador = $this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE);
+
+        // No existen rutas de edición ni de borrado de movimientos.
+        $this->assertFalse(Route::has('movimientos.destroy'));
+        $this->assertFalse(Route::has('movimientos.update'));
+        $this->actingAs($administrador)->delete('/movimientos/'.$movimiento->id_movimiento)->assertNotFound();
+        $this->actingAs($administrador)->put('/movimientos/'.$movimiento->id_movimiento, [])->assertNotFound();
+
+        $this->assertNotSoftDeleted($movimiento);
+    }
+
+    // ---------- Listado ----------
+
+    public function test_el_listado_muestra_accion_pieza_cantidad_huecos_saldo_y_usuario(): void
+    {
+        $otroHueco = $this->hueco('B-02');
+        $this->registrar(Movimiento::TRASLADO, ['cantidad' => 2, 'origen' => $this->hueco->id_etiqueta, 'destino' => $otroHueco->id_etiqueta]);
 
         foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
-            $this->actingAs($this->usuarioConRol($rol))
-                ->get(route('movimientos.index'))
+            $this->actingAs($this->usuarioConRol($rol))->get(route('movimientos.index'))
                 ->assertOk()
-                ->assertSee('Salida')
-                ->assertSee('01/02/2026')
-                ->assertSee('Frenos')
-                ->assertSee('Desguace Levante');
+                ->assertSeeInOrder(['Mover pieza', 'Radiador', '2', $this->hueco->rutaCompleta(), $otroHueco->rutaCompleta(), '6', '6', $this->gerente->name])
+                ->assertSeeInOrder(['Entrada', 'Radiador', '6', '0', '6']);
         }
     }
 
-    public function test_el_listado_muestra_el_detalle_con_desguace_y_modulo(): void
+    public function test_los_movimientos_antiguos_se_muestran_como_historicos(): void
     {
-        $categoria = $this->categoriaCoherente('Frenos', 'Desguace Levante', 'Módulo Z');
-        Movimiento::factory()->create(['id_categoria' => $categoria->categoria_id]);
+        Movimiento::factory()->create(['tipo_movimiento' => 'Salida', 'cantidad' => 3, 'id_categoria' => $this->categoria->categoria_id]);
 
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.index'))
+        $this->actingAs($this->gerente)->get(route('movimientos.index'))
             ->assertOk()
-            ->assertSee('Desguace de la categoría')
-            ->assertSee('Módulo Z');
+            ->assertSee('Histórico · Salida')
+            ->assertSee('Motor');
     }
 
-    public function test_estado_vacio_sin_movimientos(): void
+    public function test_estado_vacio_y_sin_resultados(): void
     {
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.index'))
-            ->assertOk()
-            ->assertSee('Todavía no hay movimientos')
-            ->assertSee('Registrar movimiento');
-    }
+        Movimiento::query()->forceDelete();
 
-    public function test_estado_vacio_con_filtros_sin_resultados(): void
-    {
-        Movimiento::factory()->create(['tipo_movimiento' => 'Entrada']);
+        $this->actingAs($this->gerente)->get(route('movimientos.index'))->assertSee('Todavía no hay movimientos');
 
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.index', ['q' => 'inexistente']))
-            ->assertOk()
+        $this->registrar(Movimiento::COMPRA, ['cantidad' => 1, 'destino' => $this->hueco->id_etiqueta]);
+        $this->actingAs($this->gerente)->get(route('movimientos.index', ['q' => 'no-existe']))
             ->assertSee('Sin resultados')
-            ->assertDontSee('Todavía no hay movimientos');
+            ->assertSee('Limpiar filtros');
     }
 
-    public function test_el_buscador_filtra_por_tipo_y_por_categoria(): void
+    public function test_los_filtros_por_accion_busqueda_y_fechas_se_combinan(): void
     {
-        $motor = $this->categoriaCoherente('Motor');
-        $frenos = $this->categoriaCoherente('Frenos');
-        Movimiento::factory()->create(['tipo_movimiento' => 'Entrada', 'id_categoria' => $motor->categoria_id]);
-        Movimiento::factory()->create(['tipo_movimiento' => 'Ajuste', 'id_categoria' => $frenos->categoria_id]);
+        $this->registrar(Movimiento::VENTA, ['cantidad' => 1, 'origen' => $this->hueco->id_etiqueta]);
+        $this->registrar(Movimiento::BAJA, ['cantidad' => 1, 'origen' => $this->hueco->id_etiqueta, 'motivo' => 'Golpe en el embalaje']);
+        $hoy = now()->toDateString();
 
-        $usuario = $this->usuarioConRol('gerente');
+        $total = fn (array $filtros) => $this->actingAs($this->gerente)->get(route('movimientos.index', $filtros))->viewData('movimientos')->total();
 
-        $this->actingAs($usuario)->get(route('movimientos.index', ['q' => 'Ajuste']))
-            ->assertOk()
-            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->total() === 1
-                && $movimientos->first()->tipo_movimiento === 'Ajuste');
-
-        $this->actingAs($usuario)->get(route('movimientos.index', ['q' => 'Motor']))
-            ->assertOk()
-            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->total() === 1
-                && $movimientos->first()->id_categoria === $motor->categoria_id);
-    }
-
-    public function test_los_filtros_por_tipo_categoria_y_fechas_se_combinan(): void
-    {
-        $motor = $this->categoriaCoherente('Motor');
-        $frenos = $this->categoriaCoherente('Frenos');
-        Movimiento::factory()->create(['tipo_movimiento' => 'Entrada', 'fecha' => '2026-01-10', 'id_categoria' => $motor->categoria_id]);
-        Movimiento::factory()->create(['tipo_movimiento' => 'Entrada', 'fecha' => '2026-03-10', 'id_categoria' => $motor->categoria_id]);
-        Movimiento::factory()->create(['tipo_movimiento' => 'Salida', 'fecha' => '2026-03-12', 'id_categoria' => $motor->categoria_id]);
-        Movimiento::factory()->create(['tipo_movimiento' => 'Entrada', 'fecha' => '2026-03-11', 'id_categoria' => $frenos->categoria_id]);
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.index', [
-                'tipo' => 'Entrada',
-                'categoria' => $motor->categoria_id,
-                'desde' => '2026-02-01',
-                'hasta' => '2026-03-31',
-            ]))
-            ->assertOk()
-            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->total() === 1
-                && $movimientos->first()->fecha->toDateString() === '2026-03-10');
-    }
-
-    public function test_el_filtro_de_tipo_ofrece_solo_los_tipos_existentes(): void
-    {
-        Movimiento::factory()->create(['tipo_movimiento' => 'Traspaso']);
-        Movimiento::factory()->create(['tipo_movimiento' => 'Traspaso']);
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.index'))
-            ->assertViewHas('tipos', fn (array $tipos) => $tipos === ['Traspaso' => 'Traspaso']);
+        $this->assertSame(3, $total([]));
+        $this->assertSame(1, $total(['accion' => 'venta']));
+        $this->assertSame(1, $total(['q' => 'embalaje']));
+        $this->assertSame(3, $total(['q' => 'Radiador']));
+        $this->assertSame(1, $total(['accion' => 'baja', 'q' => 'Radiador', 'desde' => $hoy, 'hasta' => $hoy]));
+        $this->assertSame(0, $total(['accion' => 'venta', 'hasta' => now()->subDay()->toDateString()]));
     }
 
     public function test_los_parametros_de_filtro_mal_formados_se_ignoran(): void
     {
-        Movimiento::factory()->count(2)->create();
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.index', ['desde' => '31/02/2026', 'hasta' => 'no-es-fecha', 'categoria' => 'abc', 'q' => ['x']]))
+        $this->actingAs($this->gerente)
+            ->get(route('movimientos.index', ['accion' => 'inventada', 'desde' => '2026-02-30', 'hasta' => 'ayer', 'q' => ['x']]))
             ->assertOk()
-            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->total() === 2);
+            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->total() === 1);
     }
 
     public function test_el_listado_se_pagina_de_15_en_15_conservando_filtros(): void
     {
-        $categoria = $this->categoriaCoherente();
-        Movimiento::factory()->count(16)->create(['tipo_movimiento' => 'Entrada', 'id_categoria' => $categoria->categoria_id]);
+        foreach (range(1, 16) as $numero) {
+            $this->registrar(Movimiento::COMPRA, ['cantidad' => 1, 'destino' => $this->hueco->id_etiqueta]);
+        }
 
-        $usuario = $this->usuarioConRol('gerente');
+        $primera = $this->actingAs($this->gerente)->get(route('movimientos.index', ['accion' => 'compra']));
+        $this->assertCount(15, $primera->viewData('movimientos'));
+        $primera->assertSee('accion=compra&amp;page=2', false);
 
-        $this->actingAs($usuario)->get(route('movimientos.index', ['tipo' => 'Entrada']))
+        $segunda = $this->actingAs($this->gerente)->get(route('movimientos.index', ['accion' => 'compra', 'page' => 2]));
+        $this->assertCount(1, $segunda->viewData('movimientos'));
+        $this->assertSame(16, $segunda->viewData('movimientos')->total());
+    }
+
+    // ---------- Registro ----------
+
+    public function test_el_registro_empieza_eligiendo_la_pieza_y_adapta_los_campos(): void
+    {
+        $this->actingAs($this->gerente)->get(route('movimientos.create'))
             ->assertOk()
-            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->count() === 15 && $movimientos->total() === 16)
-            ->assertSee('tipo=Entrada&amp;page=2', false);
+            ->assertSee('Radiador · 6 uds.')
+            ->assertSee('Continuar');
 
-        $this->actingAs($usuario)->get(route('movimientos.index', ['tipo' => 'Entrada', 'page' => 2]))
-            ->assertViewHas('movimientos', fn ($movimientos) => $movimientos->count() === 1);
+        $this->actingAs($this->gerente)->get(route('movimientos.create', ['pieza' => $this->pieza->id_pieza, 'accion' => 'venta']))
+            ->assertOk()
+            ->assertSee('Pieza: Radiador · stock actual 6')
+            ->assertSee('data-selector-accion', false)
+            ->assertSee('data-acciones="venta baja traslado"', false)
+            ->assertSee('data-acciones="entrada compra traslado"', false)
+            ->assertSeeInOrder(['Entrada', 'Compra', 'Venta', 'Eliminar pieza', 'Mover pieza'])
+            ->assertSee($this->hueco->rutaCompleta().' (6 unidades)')
+            ->assertSee('name="clave_envio"', false)
+            // El gerente no puede retirar la ficha completa.
+            ->assertDontSee('name="retirar_ficha"', false);
+
+        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
+            ->get(route('movimientos.create', ['pieza' => $this->pieza->id_pieza]))
+            ->assertSee('name="retirar_ficha"', false);
     }
 
-    public function test_el_boton_de_eliminar_solo_aparece_a_quien_puede_eliminar(): void
+    public function test_el_registro_avisa_si_no_hay_piezas(): void
     {
-        $movimiento = Movimiento::factory()->create();
-        $urlDeBorrado = route('movimientos.destroy', $movimiento);
+        Movimiento::query()->forceDelete();
+        ExistenciaPieza::query()->delete();
+        Pieza::query()->forceDelete();
 
-        $this->actingAs($this->usuarioConRol('operario'))->get(route('movimientos.index'))->assertForbidden();
-        $this->actingAs($this->usuarioConRol('gerente'))->get(route('movimientos.index'))->assertDontSee($urlDeBorrado);
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))->get(route('movimientos.index'))->assertSee($urlDeBorrado);
+        $this->actingAs($this->gerente)->get(route('movimientos.create'))
+            ->assertOk()
+            ->assertSee('No hay piezas');
     }
 
-    public function test_gerente_y_administrador_pueden_registrar_movimientos_y_el_operario_no(): void
+    public function test_gerente_y_administrador_registran_movimientos_y_vuelven_a_la_ficha(): void
     {
-        $categoria = $this->categoriaCoherente();
-
-        // El operario es de solo lectura: no registra movimientos ni ve el módulo.
-        $operario = $this->usuarioConRol('operario');
-        $this->actingAs($operario)->get(route('movimientos.create'))->assertForbidden();
-        $this->actingAs($operario)->post(route('movimientos.store'), $this->datosValidos($categoria))->assertForbidden();
-
         foreach (['gerente', RoleSeeder::ADMIN_DESGUACE] as $rol) {
-            $usuario = $this->usuarioConRol($rol);
-
-            $this->actingAs($usuario)->get(route('movimientos.create'))
-                ->assertOk()
-                ->assertSee('Registrar movimiento')
-                ->assertSee('Guardar movimiento')
-                ->assertSee('Cancelar')
-                ->assertSee('Motor · Desguace Norte');
-
-            $this->actingAs($usuario)->post(route('movimientos.store'), $this->datosValidos($categoria))
-                ->assertRedirect(route('movimientos.index'))
+            $this->actingAs($this->usuarioConRol($rol))
+                ->post(route('movimientos.store', $this->pieza), [
+                    'accion' => 'compra', 'cantidad' => 2, 'destino' => $this->hueco->id_etiqueta, 'clave_envio' => (string) Str::uuid(),
+                ])
+                ->assertRedirect(route('piezas.show', $this->pieza))
                 ->assertSessionHas('success');
         }
 
-        // Uno por cada rol autorizado (gerente y administrador de desguace).
-        $this->assertDatabaseCount('movimientos', 2);
-        $this->assertDatabaseHas('movimientos', [
-            'tipo_movimiento' => 'Entrada',
-            'cantidad' => 5,
-            'id_categoria' => $categoria->categoria_id,
-        ]);
-        $this->assertSame('2026-03-10', Movimiento::first()->fecha->toDateString());
+        $this->assertSame(10, $this->pieza->fresh()->stock);
+        $this->assertSame(2, Movimiento::where('tipo_movimiento', 'compra')->count());
     }
 
-    public function test_registrar_un_movimiento_no_modifica_el_stock_de_las_piezas(): void
+    public function test_los_campos_que_no_corresponden_a_la_accion_se_ignoran(): void
     {
-        $categoria = $this->categoriaCoherente();
-        $pieza = Pieza::factory()->create(['stock' => 4]);
+        // Una compra con un motivo y un origen (como si el formulario no ocultara esos campos).
+        $this->actingAs($this->gerente)->post(route('movimientos.store', $this->pieza), [
+            'accion' => 'compra', 'cantidad' => 1, 'destino' => $this->hueco->id_etiqueta,
+            'origen' => 'pendiente', 'motivo' => 'No aplica', 'clave_envio' => (string) Str::uuid(),
+        ])->assertSessionHasNoErrors();
 
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->post(route('movimientos.store'), $this->datosValidos($categoria))
-            ->assertRedirect(route('movimientos.index'));
-
-        $this->assertSame(4, $pieza->fresh()->stock);
+        $compra = Movimiento::where('tipo_movimiento', 'compra')->firstOrFail();
+        $this->assertNull($compra->motivo);
+        $this->assertNull($compra->id_etiqueta_origen);
     }
 
-    public function test_el_formulario_avisa_si_no_hay_categorias(): void
+    public function test_sin_clave_de_envio_se_pide_volver_a_abrir_el_formulario(): void
     {
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->get(route('movimientos.create'))
-            ->assertOk()
-            ->assertSee('No hay categorías')
-            ->assertDontSee('Guardar movimiento');
+        $this->actingAs($this->gerente)
+            ->post(route('movimientos.store', $this->pieza), ['accion' => 'compra', 'cantidad' => 1, 'destino' => $this->hueco->id_etiqueta])
+            ->assertSessionHasErrors(['clave_envio' => 'El formulario ha caducado. Vuelve a abrirlo e inténtalo de nuevo.']);
+
+        $this->assertSame(6, $this->pieza->fresh()->stock);
     }
 
-    public function test_validacion_de_campos_obligatorios(): void
+    public function test_no_se_registran_movimientos_de_una_pieza_archivada_o_inexistente(): void
     {
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->from(route('movimientos.create'))
-            ->post(route('movimientos.store'), [])
-            ->assertRedirect(route('movimientos.create'))
-            ->assertSessionHasErrors(['tipo_movimiento', 'fecha', 'cantidad', 'id_categoria']);
+        $this->pieza->delete();
 
-        $this->assertDatabaseCount('movimientos', 0);
-    }
-
-    public function test_validacion_de_valores_incorrectos(): void
-    {
-        $categoria = $this->categoriaCoherente();
-        $usuario = $this->usuarioConRol('gerente');
-
-        $this->actingAs($usuario)->post(route('movimientos.store'), array_merge($this->datosValidos($categoria), [
-            'tipo_movimiento' => str_repeat('a', 51),
-            'fecha' => 'no-es-fecha',
-            'cantidad' => '0',
-            'id_categoria' => '999999',
-        ]))->assertSessionHasErrors(['tipo_movimiento', 'fecha', 'cantidad', 'id_categoria']);
-
-        $this->actingAs($usuario)->post(route('movimientos.store'), array_merge($this->datosValidos($categoria), ['cantidad' => '2.5']))
-            ->assertSessionHasErrors('cantidad');
-
-        $this->assertDatabaseCount('movimientos', 0);
-    }
-
-    public function test_no_se_puede_registrar_un_movimiento_en_una_categoria_eliminada(): void
-    {
-        $categoria = $this->categoriaCoherente();
-        $categoria->delete();
-
-        $this->actingAs($this->usuarioConRol('gerente'))
-            ->post(route('movimientos.store'), $this->datosValidos($categoria))
-            ->assertSessionHasErrors('id_categoria');
-    }
-
-    public function test_solo_el_administrador_elimina_movimientos(): void
-    {
-        $movimiento = Movimiento::factory()->create();
-
-        $this->actingAs($this->usuarioConRol())->delete(route('movimientos.destroy', $movimiento))->assertForbidden();
-        $this->actingAs($this->usuarioConRol('operario'))->delete(route('movimientos.destroy', $movimiento))->assertForbidden();
-        $this->actingAs($this->usuarioConRol('gerente'))->delete(route('movimientos.destroy', $movimiento))->assertForbidden();
-        $this->assertNotSoftDeleted($movimiento);
-
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
-            ->delete(route('movimientos.destroy', $movimiento))
-            ->assertRedirect(route('movimientos.index'))
-            ->assertSessionHas('success');
-
-        $this->assertSoftDeleted($movimiento);
-    }
-
-    public function test_eliminar_un_movimiento_inexistente_devuelve_404(): void
-    {
-        $this->actingAs($this->usuarioConRol(RoleSeeder::ADMIN_DESGUACE))
-            ->delete(route('movimientos.destroy', 999999))
-            ->assertNotFound();
+        $this->actingAs($this->gerente)->post(route('movimientos.store', $this->pieza), [
+            'accion' => 'compra', 'cantidad' => 1, 'destino' => $this->hueco->id_etiqueta, 'clave_envio' => (string) Str::uuid(),
+        ])->assertNotFound();
+        $this->actingAs($this->gerente)->get(route('movimientos.create', ['pieza' => 99999]))->assertNotFound();
     }
 }

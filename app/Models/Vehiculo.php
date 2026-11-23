@@ -35,6 +35,19 @@ class Vehiculo extends Model
         ];
     }
 
+    /**
+     * Cada marca y modelo registrados en un vehículo pasan al catálogo común,
+     * para poder elegirlos al dar de alta las piezas que salen de él.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (Vehiculo $vehiculo): void {
+            if ($vehiculo->wasChanged(['marca', 'modelo']) || $vehiculo->wasRecentlyCreated) {
+                Marca::registrarModelo($vehiculo->marca, $vehiculo->modelo);
+            }
+        });
+    }
+
     public function desguace(): BelongsTo
     {
         return $this->belongsTo(Desguace::class, 'id_desguace', 'id_desguace');

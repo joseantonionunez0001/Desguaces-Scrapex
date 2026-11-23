@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Route;
 // Gestión de tipos de pieza. La clave primaria del modelo es "id_pieza", por eso el parámetro
 // de ruta se llama {tipoPieza} y no {pieza} (que pertenece al catálogo de piezas).
 Route::middleware('auth')->group(function () {
+    Route::get('/tipos-pieza', [TipoPiezaController::class, 'index'])
+        ->middleware('permission:tipo_piezas.ver')
+        ->name('tipos-pieza.index');
 
     Route::post('/tipos-pieza', [TipoPiezaController::class, 'store'])
         ->middleware('permission:tipo_piezas.crear')

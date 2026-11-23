@@ -2,16 +2,22 @@
 
 namespace App\Http\Requests\Web;
 
+use App\Http\Requests\Web\Concerns\MensajesDeValidacion;
 use App\Models\Categoria;
 use App\Rules\ExisteEnMiSede;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Alta y edición de tipos de pieza. Reproduce las reglas de TipoPiezaApiController.
+ * Alta y edición de tipos de pieza («Alternador», «Faro delantero»…), vinculados a su categoría.
+ *
+ * La relación con la categoría tiene una única fuente: id_categoria. La marca y el modelo del vehículo
+ * pertenecen a cada pieza, no al tipo. El fabricante es opcional.
  */
 class TipoPiezaRequest extends FormRequest
 {
+    use MensajesDeValidacion;
+
     public function authorize(): bool
     {
         $permiso = $this->isMethod('POST') ? 'tipo_piezas.crear' : 'tipo_piezas.editar';
@@ -26,11 +32,9 @@ class TipoPiezaRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'max:255'],
-            'marca' => ['required', 'string', 'max:255'],
-            'modelo' => ['required', 'string', 'max:255'],
-            'fabricante' => ['required', 'string', 'max:255'],
-            'categoria' => ['required', 'string', 'max:255'],
             'id_categoria' => ['required', new ExisteEnMiSede(Categoria::class)],
+            'fabricante' => ['nullable', 'string', 'max:255'],
+            '_modal' => ['nullable', 'string', 'max:100'],
         ];
     }
 
@@ -39,12 +43,7 @@ class TipoPiezaRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'required' => 'El campo :attribute es obligatorio.',
-            'string' => 'El campo :attribute debe ser un texto.',
-            'max.string' => 'El campo :attribute no puede superar los :max caracteres.',
-            'exists' => 'La categoría seleccionada no existe.',
-        ];
+        return $this->mensajesEnEspanol(['nombre', 'id_categoria', 'fabricante']);
     }
 
     /**
@@ -54,11 +53,8 @@ class TipoPiezaRequest extends FormRequest
     {
         return [
             'nombre' => 'nombre',
-            'marca' => 'marca',
-            'modelo' => 'modelo',
+            'id_categoria' => 'categoría',
             'fabricante' => 'fabricante',
-            'categoria' => 'categoría (texto)',
-            'id_categoria' => 'categoría relacionada',
         ];
     }
 }

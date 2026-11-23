@@ -73,7 +73,7 @@
                         hint="Suma de precio × stock de todas las piezas" />
                     <x-ui.stat-card label="Piezas con stock bajo" :value="number_format($indicadores['piezas']['stock_bajo'], 0, ',', '.')" icon="warning"
                         :tone="$indicadores['piezas']['stock_bajo'] > 0 ? 'amber' : 'emerald'"
-                        hint="Stock igual o inferior al stock mínimo" />
+                        hint="Con unidades, pero en el stock mínimo o por debajo" />
                 @endisset
             </div>
 

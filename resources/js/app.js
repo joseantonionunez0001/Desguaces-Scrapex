@@ -109,7 +109,70 @@ window.addEventListener('pageshow', (evento) => {
     });
 });
 
+/*
+ * Desplegables dependientes: <select data-depende-de="campo"> con <option data-padre="valor">.
+ * Al elegir un valor en el campo padre (mismo formulario) solo quedan visibles sus opciones;
+ * si la opción elegida deja de corresponder, se vacía. Sin valor en el padre se muestran todas.
+ * Solo es una ayuda: el servidor vuelve a validar la relación.
+ */
+function filtrarDependientes(padre) {
+    const formulario = padre.form;
+    if (!formulario || !padre.name) {
+        return;
+    }
+    formulario.querySelectorAll(`select[data-depende-de="${padre.name}"]`).forEach((hijo) => {
+        Array.from(hijo.options).forEach((opcion) => {
+            const padreDeLaOpcion = opcion.getAttribute('data-padre');
+            const visible = opcion.value === '' || padre.value === '' || padreDeLaOpcion === padre.value;
+            opcion.hidden = !visible;
+            opcion.disabled = !visible;
+        });
+        const elegida = hijo.selectedOptions[0];
+        if (elegida && elegida.disabled) {
+            hijo.value = '';
+        }
+        filtrarDependientes(hijo);
+    });
+}
+
+document.addEventListener('change', (evento) => {
+    if (evento.target instanceof HTMLSelectElement) {
+        filtrarDependientes(evento.target);
+    }
+});
+
+/*
+ * Campos según la acción: los elementos con data-acciones="venta baja" solo se muestran (y envían)
+ * cuando el <select data-selector-accion> del mismo formulario tiene una de esas acciones.
+ */
+function mostrarCamposDeAccion(selector) {
+    const formulario = selector.form;
+    if (!formulario) {
+        return;
+    }
+    formulario.querySelectorAll('[data-acciones]').forEach((bloque) => {
+        const visible = bloque.getAttribute('data-acciones').split(' ').includes(selector.value);
+        bloque.hidden = !visible;
+        bloque.querySelectorAll('input, select, textarea').forEach((campo) => {
+            campo.disabled = !visible;
+        });
+    });
+}
+
+document.addEventListener('change', (evento) => {
+    if (evento.target instanceof HTMLSelectElement && evento.target.hasAttribute('data-selector-accion')) {
+        mostrarCamposDeAccion(evento.target);
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('select').forEach((campo) => {
+        if (campo.form && campo.name && campo.form.querySelector(`select[data-depende-de="${campo.name}"]`)) {
+            filtrarDependientes(campo);
+        }
+    });
+    document.querySelectorAll('select[data-selector-accion]').forEach(mostrarCamposDeAccion);
+
     document.querySelectorAll('dialog[data-open-on-load]').forEach((modal) => {
         if (typeof modal.showModal === 'function' && !modal.open) {
             modal.showModal();

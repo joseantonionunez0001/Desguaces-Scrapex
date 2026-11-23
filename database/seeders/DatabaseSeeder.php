@@ -7,6 +7,8 @@ use App\Models\Desguace;
 use App\Models\Estanteria;
 use App\Models\Etiqueta;
 use App\Models\Fila;
+use App\Models\Marca;
+use App\Models\ModeloVehiculo;
 use App\Models\Modulo;
 use App\Models\Movimiento;
 use App\Models\Nivel;
@@ -19,9 +21,11 @@ use App\Models\TipoPieza;
 use App\Models\UbicacionVehiculo;
 use App\Models\User;
 use App\Models\Vehiculo;
+use App\Services\InventarioPiezas;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -134,24 +138,46 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 7 y 8 y 9. Tipos de pieza, piezas y movimientos por categoría.
+        // 7. Catálogo de marcas y modelos con los vehículos registrados
+        //    (los eventos de modelo están desactivados en el seeder, así que se hace aquí).
+        foreach ($vehiculos as $vehiculo) {
+            Marca::registrarModelo($vehiculo->marca, $vehiculo->modelo);
+        }
+
+        $modelos = ModeloVehiculo::all();
+        $inventario = app(InventarioPiezas::class);
+
+        // 8 y 9. Tipos de pieza y piezas por categoría. Cada pieza entra con su Entrada inicial
+        //        en un hueco del almacén interior de su desguace; algunas registran además una venta.
         foreach ($categorias as $categoria) {
+            // Sin el alcance del usuario autenticado (el seeder puede ejecutarse dentro de una prueba).
+            $huecos = Etiqueta::query()->withoutGlobalScopes()->whereNull('deleted_at')->delDesguace($categoria->id_desguace)->get();
+            $personal = $usuarios->where('id_desguace', $categoria->id_desguace)->values();
+            $personal = $personal->isEmpty() ? $usuarios : $personal;
+
             $tiposPieza = TipoPieza::factory(2)
                 ->state(['id_categoria' => $categoria->categoria_id])
                 ->create();
 
             foreach ($tiposPieza as $tipoPieza) {
-                Pieza::factory(3)
-                    ->state(fn () => [
-                        'id_usuario' => $usuarios->random()->id,
+                foreach (range(1, 3) as $numero) {
+                    $usuario = $personal->random();
+                    $datos = Pieza::factory()->make([
+                        'id_usuario' => $usuario->id,
                         'id_tipo_pieza' => $tipoPieza->id_pieza,
-                    ])
-                    ->create();
-            }
+                        'id_modelo_vehiculo' => $modelos->random()?->id_modelo,
+                    ])->only(['nombre', 'precio', 'estado', 'stock_minimo', 'id_tipo_pieza', 'id_modelo_vehiculo']);
 
-            Movimiento::factory(2)
-                ->state(['id_categoria' => $categoria->categoria_id])
-                ->create();
+                    $pieza = $inventario->darDeAlta($datos, fake()->numberBetween(1, 10), $huecos->random()->id_etiqueta, $usuario, (string) Str::uuid());
+
+                    if ($numero === 1 && $pieza->stock > 1) {
+                        $inventario->registrar($pieza, Movimiento::VENTA, [
+                            'cantidad' => 1,
+                            'origen' => $pieza->existencias()->withoutGlobalScopes()->value('id_etiqueta'),
+                        ], $usuario, (string) Str::uuid());
+                    }
+                }
+            }
         }
 
         // 10. Historial de ubicación: una ubicación cerrada y otra abierta por vehículo.

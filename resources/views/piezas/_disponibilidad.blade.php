@@ -1,14 +1,17 @@
 {{--
-    Disponibilidad de una pieza: disponible si stock > 0; aviso de stock bajo si stock <= stock mínimo.
+    Disponibilidad calculada a partir de las existencias (Pieza::disponibilidad()):
+    Con stock (hay unidades por encima del mínimo), Stock bajo (hay unidades, pero el saldo es igual
+    o inferior al mínimo) o Agotada (stock cero). Es independiente del estado físico.
     Variable: $pieza.
 --}}
-<span class="inline-flex flex-wrap items-center gap-1">
-    @if ($pieza->stock > 0)
-        <x-ui.badge tone="emerald">Disponible</x-ui.badge>
-    @else
-        <x-ui.badge tone="red">No disponible</x-ui.badge>
-    @endif
-    @if ($pieza->stock <= $pieza->stock_minimo)
+@php($disponibilidad = $pieza->disponibilidad())
+@switch($disponibilidad)
+    @case(\App\Models\Pieza::AGOTADA)
+        <x-ui.badge tone="red">Agotada</x-ui.badge>
+        @break
+    @case(\App\Models\Pieza::STOCK_BAJO)
         <x-ui.badge tone="amber">Stock bajo</x-ui.badge>
-    @endif
-</span>
+        @break
+    @default
+        <x-ui.badge tone="emerald">Con stock</x-ui.badge>
+@endswitch

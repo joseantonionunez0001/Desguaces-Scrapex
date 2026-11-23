@@ -4,36 +4,47 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\MovimientoRequest;
+use App\Models\Etiqueta;
 use App\Models\Movimiento;
-use App\Support\OpcionesCategorias;
+use App\Models\Pieza;
+use App\Services\InventarioPiezas;
+use App\Support\OpcionesInventario;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
+/**
+ * Movimientos de inventario: Entrada, Compra, Venta, Eliminar pieza y Mover pieza.
+ *
+ * Cada movimiento se registra sobre una pieza concreta con InventarioPiezas, que actualiza en la misma
+ * transacción las existencias por hueco y el saldo. El historial no se edita ni se borra.
+ */
 class MovimientoController extends Controller
 {
-    /**
-     * Listado paginado con buscador y filtros por tipo, categoría y rango de fechas.
-     */
     public function index(Request $request): View
     {
         $busqueda = $this->textoDeConsulta($request, 'q');
-        $tipo = $this->textoDeConsulta($request, 'tipo');
-        $categoriaId = ctype_digit($this->textoDeConsulta($request, 'categoria')) ? (int) $request->query('categoria') : null;
+        $accion = $this->textoDeConsulta($request, 'accion');
+        $accion = array_key_exists($accion, Movimiento::ACCIONES) ? $accion : '';
         $desde = $this->fechaDeConsulta($request, 'desde');
         $hasta = $this->fechaDeConsulta($request, 'hasta');
 
         $movimientos = Movimiento::query()
-            ->with(['categoria' => fn ($consulta) => $consulta->withTrashed()->with([
-                'desguace' => fn ($relacion) => $relacion->withTrashed(),
-                'modulo' => fn ($relacion) => $relacion->withTrashed(),
-            ])])
+            ->with([
+                'pieza' => fn ($consulta) => $consulta->withTrashed(),
+                'usuario' => fn ($consulta) => $consulta->withTrashed(),
+                'categoria' => fn ($consulta) => $consulta->withTrashed(),
+                'origen' => fn ($consulta) => $consulta->withTrashed(),
+                'destino' => fn ($consulta) => $consulta->withTrashed(),
+                ...Etiqueta::relacionesDeRuta('origen.'),
+                ...Etiqueta::relacionesDeRuta('destino.'),
+            ])
             ->when($busqueda !== '', fn ($consulta) => $consulta->where(function ($grupo) use ($busqueda): void {
-                $grupo->where('tipo_movimiento', 'like', "%{$busqueda}%")
-                    ->orWhereHas('categoria', fn ($categoria) => $categoria->where('nombre', 'like', "%{$busqueda}%"));
+                $grupo->whereHas('pieza', fn ($pieza) => $pieza->withTrashed()->where('nombre', 'like', "%{$busqueda}%"))
+                    ->orWhere('motivo', 'like', "%{$busqueda}%");
             }))
-            ->when($tipo !== '', fn ($consulta) => $consulta->where('tipo_movimiento', $tipo))
-            ->when($categoriaId !== null, fn ($consulta) => $consulta->where('id_categoria', $categoriaId))
+            ->when($accion !== '', fn ($consulta) => $consulta->where('tipo_movimiento', $accion))
             ->when($desde !== null, fn ($consulta) => $consulta->whereDate('fecha', '>=', $desde))
             ->when($hasta !== null, fn ($consulta) => $consulta->whereDate('fecha', '<=', $hasta))
             ->orderByDesc('fecha')
@@ -43,69 +54,78 @@ class MovimientoController extends Controller
 
         return view('movimientos.index', [
             'movimientos' => $movimientos,
-            'tipos' => $this->tiposDeMovimiento(),
-            'categorias' => OpcionesCategorias::paraSelect(),
-            'filtros' => [
-                'q' => $busqueda,
-                'tipo' => $tipo,
-                'categoria' => $categoriaId,
-                'desde' => $desde,
-                'hasta' => $hasta,
-            ],
-            'hayFiltros' => $busqueda !== '' || $tipo !== '' || $categoriaId !== null || $desde !== null || $hasta !== null,
+            'acciones' => Movimiento::ACCIONES,
+            'filtros' => ['q' => $busqueda, 'accion' => $accion, 'desde' => $desde, 'hasta' => $hasta],
+            'hayFiltros' => $busqueda !== '' || $accion !== '' || $desde !== null || $hasta !== null,
         ]);
     }
 
     /**
-     * Formulario de registro de un movimiento.
+     * GET /movimientos/crear?pieza=ID&accion=venta
+     * Sin pieza muestra el selector de pieza; con pieza, el formulario adaptado a la acción.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
+        $idPieza = $this->textoDeConsulta($request, 'pieza');
+
+        if (! ctype_digit($idPieza)) {
+            return view('movimientos.create', [
+                'pieza' => null,
+                'piezas' => Pieza::query()->orderBy('nombre')->get(['id_pieza', 'nombre', 'stock'])
+                    ->mapWithKeys(fn (Pieza $pieza): array => [$pieza->id_pieza => "{$pieza->nombre} · {$pieza->stock} uds."])
+                    ->all(),
+            ]);
+        }
+
+        // La pieza debe ser de la sede del usuario: si no, 404 como si no existiera.
+        $pieza = Pieza::query()->findOrFail((int) $idPieza);
+        $accion = $this->textoDeConsulta($request, 'accion');
+
         return view('movimientos.create', [
-            'tipos' => $this->tiposDeMovimiento(),
-            'categorias' => OpcionesCategorias::paraSelect(),
+            'pieza' => $pieza,
+            'accion' => array_key_exists($accion, Movimiento::ACCIONES) ? $accion : Movimiento::ENTRADA,
+            'acciones' => $this->accionesPermitidas($request),
+            'origenes' => OpcionesInventario::origenes($pieza),
+            'huecos' => OpcionesInventario::huecos(),
+            'claveEnvio' => (string) Str::uuid(),
+            'puedeRetirarFicha' => $request->user()->can('piezas.eliminar'),
         ]);
     }
 
     /**
-     * Guarda el movimiento. No modifica existencias de piezas: el esquema no relaciona
-     * movimientos con piezas.
+     * POST /piezas/{pieza}/movimientos
      */
-    public function store(MovimientoRequest $request): RedirectResponse
+    public function store(MovimientoRequest $request, Pieza $pieza, InventarioPiezas $inventario): RedirectResponse
     {
-        $movimiento = new Movimiento;
-        $movimiento->fill($request->validated());
-        $movimiento->save();
+        $accion = $request->validated('accion');
+
+        $movimientos = $inventario->registrar(
+            $pieza,
+            $accion,
+            $request->datosDelMovimiento(),
+            $request->user(),
+            $request->validated('clave_envio'),
+        );
+
+        $retirada = $accion === Movimiento::BAJA && $request->datosDelMovimiento()['retirar_ficha'];
+
+        if ($retirada) {
+            return redirect()
+                ->route('movimientos.index')
+                ->with('success', "La pieza «{$pieza->nombre}» se ha retirado y queda archivada con su historial.");
+        }
 
         return redirect()
-            ->route('movimientos.index')
-            ->with('success', 'Movimiento registrado correctamente.');
+            ->route('piezas.show', $pieza)
+            ->with('success', 'Movimiento «'.Movimiento::ACCIONES[$accion].'» registrado ('.$movimientos->sum('cantidad').' uds.). Stock actual: '.$pieza->fresh()->stock.'.');
     }
 
     /**
-     * Borrado lógico del movimiento (igual que la API).
-     */
-    public function destroy(Movimiento $movimiento): RedirectResponse
-    {
-        $movimiento->delete();
-
-        return redirect()
-            ->route('movimientos.index')
-            ->with('success', 'Movimiento eliminado correctamente.');
-    }
-
-    /**
-     * Tipos de movimiento que ya existen en la base de datos (la API admite cualquier texto de hasta 50 caracteres).
-     *
      * @return array<string, string>
      */
-    private function tiposDeMovimiento(): array
+    private function accionesPermitidas(Request $request): array
     {
-        return Movimiento::query()
-            ->distinct()
-            ->orderBy('tipo_movimiento')
-            ->pluck('tipo_movimiento', 'tipo_movimiento')
-            ->all();
+        return $request->user()->can('movimientos.crear') ? Movimiento::ACCIONES : [];
     }
 
     private function textoDeConsulta(Request $request, string $clave): string
@@ -115,9 +135,6 @@ class MovimientoController extends Controller
         return is_string($valor) ? trim($valor) : '';
     }
 
-    /**
-     * Devuelve la fecha (AAAA-MM-DD) solo si es válida; un valor mal formado se ignora.
-     */
     private function fechaDeConsulta(Request $request, string $clave): ?string
     {
         $valor = $this->textoDeConsulta($request, $clave);

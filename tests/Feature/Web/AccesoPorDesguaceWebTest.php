@@ -3,10 +3,12 @@
 namespace Tests\Feature\Web;
 
 use App\Models\Desguace;
+use App\Models\ModeloVehiculo;
 use App\Models\Pieza;
 use App\Models\Vehiculo;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\Support\PreparaAutorizacion;
 use Tests\TestCase;
 
@@ -44,13 +46,20 @@ class AccesoPorDesguaceWebTest extends TestCase
      */
     private function datosPieza(int $idTipo): array
     {
+        $modelo = ModeloVehiculo::factory()->create();
+
         return [
             'nombre' => 'Faro',
-            'precio' => 30,
-            'estado' => 'Usada',
-            'stock' => 3,
-            'stock_minimo' => 1,
+            'id_marca' => $modelo->id_marca,
+            'id_modelo_vehiculo' => $modelo->id_modelo,
+            'id_categoria' => $this->invA['categoria']->categoria_id,
             'id_tipo_pieza' => $idTipo,
+            'estado' => 'Buen estado',
+            'precio' => 30,
+            'stock_minimo' => 1,
+            'cantidad' => 3,
+            'id_etiqueta' => $this->invA['etiqueta']->id_etiqueta,
+            'clave_envio' => (string) Str::uuid(),
         ];
     }
 
@@ -76,7 +85,10 @@ class AccesoPorDesguaceWebTest extends TestCase
         $this->actingAs($administrador)->put(route('vehiculos.update', $vehiculoB), $this->datosVehiculo($this->sedeA))->assertNotFound();
         $this->actingAs($administrador)->delete(route('vehiculos.destroy', $vehiculoB))->assertNotFound();
         $this->actingAs($administrador)->get(route('piezas.edit', $piezaB))->assertNotFound();
-        $this->actingAs($administrador)->delete(route('piezas.destroy', $piezaB))->assertNotFound();
+        $this->actingAs($administrador)->post(route('movimientos.store', $piezaB), [
+            'accion' => 'baja', 'motivo' => 'x', 'retirar_ficha' => '1', 'clave_envio' => (string) Str::uuid(),
+        ])->assertNotFound();
+        $this->actingAs($administrador)->get(route('movimientos.create', ['pieza' => $piezaB->id_pieza]))->assertNotFound();
         $this->actingAs($administrador)->get(route('vehiculos.ubicaciones.asignar', $vehiculoB))->assertNotFound();
 
         $this->assertNull(Vehiculo::withoutGlobalScopes()->find($vehiculoB->id_vehiculo)->deleted_at);
@@ -155,8 +167,14 @@ class AccesoPorDesguaceWebTest extends TestCase
         $this->actingAs($operario)->post(route('vehiculos.store'), $this->datosVehiculo($this->sedeA))->assertForbidden();
         $this->actingAs($operario)->put(route('vehiculos.update', $vehiculo), $this->datosVehiculo($this->sedeA))->assertForbidden();
         $this->actingAs($operario)->delete(route('vehiculos.destroy', $vehiculo))->assertForbidden();
-        $this->actingAs($operario)->put(route('piezas.update', $pieza), $this->datosPieza($this->invA['tipo']->id_pieza) + ['stock' => 99])->assertForbidden();
-        $this->actingAs($operario)->delete(route('piezas.destroy', $pieza))->assertForbidden();
+        $this->actingAs($operario)->put(route('piezas.update', $pieza), $this->datosPieza($this->invA['tipo']->id_pieza))->assertForbidden();
+        $this->actingAs($operario)->get(route('movimientos.create', ['pieza' => $pieza->id_pieza]))->assertForbidden();
+        $this->actingAs($operario)->post(route('movimientos.store', $pieza), [
+            'accion' => 'venta', 'cantidad' => 1, 'origen' => 'pendiente', 'clave_envio' => (string) Str::uuid(),
+        ])->assertForbidden();
+        $this->actingAs($operario)->post(route('movimientos.store', $pieza), [
+            'accion' => 'baja', 'motivo' => 'x', 'retirar_ficha' => '1', 'clave_envio' => (string) Str::uuid(),
+        ])->assertForbidden();
 
         foreach (['movimientos.index', 'categorias.index', 'desguaces.index', 'almacen.interior.index', 'admin.usuarios.index'] as $ruta) {
             $this->actingAs($operario)->get(route($ruta))->assertForbidden();

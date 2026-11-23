@@ -285,14 +285,18 @@ class AccesoPorDesguaceTest extends TestCase
         $this->postJson('/api/vehiculos', $this->datosVehiculo($this->sedeA))->assertStatus(201);
         $this->putJson("/api/vehiculos/{$this->invA['vehiculo']->id_vehiculo}", $this->datosVehiculo($this->sedeA))
             ->assertOk();
-        $this->postJson('/api/piezas', [
-            'nombre' => 'Faro', 'precio' => 30, 'estado' => 'Usada', 'stock' => 3, 'stock_minimo' => 1,
-            'id_usuario' => $gerente->id, 'id_tipo_pieza' => $this->invA['tipo']->id_pieza,
-        ])->assertStatus(201);
+        // El alta registra la Entrada inicial en un hueco de la sede; después el stock cambia con movimientos.
+        $idPieza = $this->postJson('/api/piezas', [
+            'nombre' => 'Faro', 'precio' => 30, 'estado' => 'Buen estado', 'stock_minimo' => 1,
+            'id_tipo_pieza' => $this->invA['tipo']->id_pieza,
+            'cantidad' => 3, 'id_etiqueta' => $this->invA['etiqueta']->id_etiqueta,
+        ])->assertStatus(201)->assertJsonPath('data.stock', 3)->json('data.id_pieza');
         $this->postJson('/api/movimientos', [
-            'tipo_movimiento' => 'Entrada', 'fecha' => '2026-02-01', 'cantidad' => 2,
-            'id_categoria' => $this->invA['categoria']->categoria_id,
+            'id_pieza' => $idPieza, 'accion' => 'compra', 'cantidad' => 2,
+            'destino' => $this->invA['etiqueta']->id_etiqueta,
         ])->assertStatus(201);
+        $this->assertSame(5, Pieza::findOrFail($idPieza)->stock);
+        $this->assertSame($gerente->id, Pieza::findOrFail($idPieza)->id_usuario);
         $this->postJson('/api/ubicaciones-vehiculo', [
             'id_vehiculo' => $this->invA['vehiculo']->id_vehiculo,
             'id_nivel' => $this->invA['nivel']->id_nivel,
@@ -324,9 +328,16 @@ class AccesoPorDesguaceTest extends TestCase
         $this->actuarComo(RoleSeeder::ADMIN_DESGUACE, $this->sedeA);
 
         foreach ($this->fichas($this->invB, $this->sedeB) as $recurso => $id) {
+            // Desguaces: sin permiso de edición (403). Movimientos: el historial no se edita ni se borra (405).
+            $esperado = match ($recurso) {
+                'desguaces' => 403,
+                'movimientos' => 405,
+                default => 404,
+            };
+
             $this->getJson("/api/{$recurso}/{$id}")->assertNotFound();
-            $this->putJson("/api/{$recurso}/{$id}", ['nombre' => 'x'])->assertStatus(in_array($recurso, ['desguaces']) ? 403 : 404);
-            $this->deleteJson("/api/{$recurso}/{$id}")->assertStatus(in_array($recurso, ['desguaces']) ? 403 : 404);
+            $this->putJson("/api/{$recurso}/{$id}", ['nombre' => 'x'])->assertStatus($esperado);
+            $this->deleteJson("/api/{$recurso}/{$id}", ['motivo' => 'x'])->assertStatus($esperado);
         }
 
         // La propia sede si responde.
@@ -400,12 +411,23 @@ class AccesoPorDesguaceTest extends TestCase
             'niveles' => [['id_posicion' => $b['posicion']->id_posicion, 'numero_nivel' => '1'], 'id_posicion'],
             'categorias' => [['nombre' => 'C', 'id_desguace' => $this->sedeA->id_desguace, 'id_modulo' => $b['modulo']->id_modulo], 'id_modulo'],
             'tipo-piezas' => [['nombre' => 'T', 'fabricante' => 'F', 'categoria' => 'C', 'id_categoria' => $b['categoria']->categoria_id], 'id_categoria'],
-            'movimientos' => [['tipo_movimiento' => 'Entrada', 'fecha' => '2026-01-01', 'cantidad' => 1, 'id_categoria' => $b['categoria']->categoria_id], 'id_categoria'],
+            'movimientos' => [['id_pieza' => $b['pieza']->id_pieza, 'accion' => 'venta', 'cantidad' => 1, 'origen' => 'pendiente'], 'id_pieza'],
             'piezas' => [[
-                'nombre' => 'P', 'precio' => 1, 'estado' => 'Usada', 'stock' => 1, 'stock_minimo' => 1,
-                'id_usuario' => $gerente->id, 'id_tipo_pieza' => $b['tipo']->id_pieza,
+                'nombre' => 'P', 'precio' => 1, 'estado' => 'Buen estado', 'stock_minimo' => 1,
+                'id_tipo_pieza' => $b['tipo']->id_pieza, 'cantidad' => 1, 'id_etiqueta' => $this->invA['etiqueta']->id_etiqueta,
             ], 'id_tipo_pieza'],
         ];
+
+        // Una pieza propia ubicada en un hueco de la otra sede, y un traslado a un hueco de la otra sede.
+        $this->postJson('/api/piezas', [
+            'nombre' => 'P', 'precio' => 1, 'estado' => 'Buen estado', 'stock_minimo' => 1,
+            'id_tipo_pieza' => $this->invA['tipo']->id_pieza, 'cantidad' => 1, 'id_etiqueta' => $b['etiqueta']->id_etiqueta,
+        ])->assertStatus(422)->assertJsonValidationErrors('id_etiqueta');
+        $this->postJson('/api/movimientos', [
+            'id_pieza' => $this->invA['pieza']->id_pieza, 'accion' => 'traslado', 'cantidad' => 1,
+            'origen' => 'pendiente', 'destino' => $b['etiqueta']->id_etiqueta,
+        ])->assertStatus(422)->assertJsonValidationErrors('destino');
+        $this->assertSame(5, $this->invA['pieza']->fresh()->stock);
 
         foreach ($casos as $recurso => [$datos, $campo]) {
             $this->postJson("/api/{$recurso}", $datos)

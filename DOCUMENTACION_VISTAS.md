@@ -22,7 +22,7 @@ realizadas, problemas detectados y cómo integrar las cuatro ramas.
 | 10 | Ficha de pieza | Alvaro-Llorente | `GET /piezas/{pieza}` | `piezas.show` | Implementada |
 | 11 | Historial de ubicaciones | Alvaro-Llorente | `GET /vehiculos/{vehiculo}/ubicaciones` | `vehiculos.ubicaciones.index` | Implementada |
 | 12 | Listado de movimientos | Jose-Antonio | `GET /movimientos` | `movimientos.index` | Implementada |
-| 13 | Registrar movimiento | Jose-Antonio | `GET /movimientos/crear`, `POST /movimientos` | `movimientos.create`, `.store` | Implementada |
+| 13 | Registrar movimiento | Jose-Antonio | `GET /movimientos/crear?pieza=`, `POST /piezas/{pieza}/movimientos` | `movimientos.create`, `.store` | Implementada |
 | 14 | Gestión de categorías | Jose-Antonio | `GET /categorias` (+ modales) | `categorias.index/store/update/destroy` | Implementada |
 | 15 | Gestión de tipos de pieza | Jose-Antonio | `GET /tipos-pieza` (+ modales) | `tipos-pieza.index/store/update/destroy` | Implementada |
 | 16 | Gestión de desguaces | Jose-Antonio | `GET /desguaces` (+ modales) | `desguaces.index/store/update/destroy` | Implementada |
@@ -47,17 +47,17 @@ Total: 6 + 5 + 5 + 5 = **21 pantallas**.
 ### Alvaro-Llorente (pantallas 7–11)
 
 - Controladores: `Web/VehiculoController`, `Web/PiezaController`, `Web/VehiculoUbicacionController`.
-- Requests: `Web/GuardarVehiculoRequest`, `Web/GuardarPiezaRequest`. Soporte: `app/Support/JerarquiaUbicacion.php`.
+- Requests: `Web/GuardarVehiculoRequest`, `Web/GuardarPiezaRequest`. Soporte: `app/Support/JerarquiaUbicacion.php`, `app/Support/OpcionesInventario.php`, `app/Services/InventarioPiezas.php` (ver `DOCUMENTACION_INVENTARIO.md`).
 - Rutas: `routes/web/vehiculos.php`, `routes/web/piezas.php` (también `/vehiculos/crear`, `/vehiculos/{id}/editar`, `/piezas/crear`, `/piezas/{id}/editar`).
 - Vistas: `vehiculos/{index,show,create,edit,_form,_ubicacion,ubicaciones}`, `piezas/{index,show,create,edit,_form,_disponibilidad}`.
-- Pruebas: `VehiculosWebTest`, `VehiculoUbicacionesWebTest`, `PiezasWebTest`.
+- Pruebas: `VehiculosWebTest`, `VehiculoUbicacionesWebTest`, `PiezasWebTest`, `InventarioPiezasWebTest`.
 
 ### Jose-Antonio (pantallas 12–16)
 
 - Controladores: `Web/MovimientoController`, `Web/CategoriaController`, `Web/TipoPiezaController`, `Web/DesguaceController`.
-- Requests: `MovimientoRequest`, `CategoriaRequest`, `TipoPiezaRequest`, `DesguaceRequest`. Soporte: `app/Support/OpcionesCategorias.php`.
+- Requests: `MovimientoRequest`, `CategoriaRequest`, `TipoPiezaRequest`, `DesguaceRequest`. Soporte: `app/Support/OpcionesInventario.php`.
 - Rutas: `routes/web/movimientos.php`, `categorias.php`, `tipos-pieza.php`, `desguaces.php`.
-- Vistas: `movimientos/{index,create,_detalle}`, `categorias/{index,_form}`, `tipos-pieza/{index,_form}`, `desguaces/{index,_form,_detalle}`.
+- Vistas: `movimientos/{index,create,_fila}`, `categorias/{index,_form}`, `tipos-pieza/{index,_form}`, `desguaces/{index,_form,_detalle}`.
 - Pruebas: `MovimientosWebTest`, `CategoriasWebTest`, `TiposPiezaWebTest`, `DesguacesWebTest`.
 
 ### Antonio (pantallas 17–21)
@@ -102,9 +102,11 @@ Todas las rutas privadas llevan `auth` y el middleware `permission:` de Spatie (
 
 | Rol | Alcance real (según `RolePermissionSeeder`) |
 |---|---|
-| administrador | Todos los permisos. |
+| administrador_plataforma | Desguaces y designación de sus administradores; consulta de cuentas y cambio de sede. Sin inventario. |
+| administrador_desguace | Todo el inventario y el equipo de su sede. |
+| administrador (anterior) | Sin permisos (ver `DOCUMENTACION_ACCESO_POR_DESGUACE.md`). |
 | gerente | Consulta de todo; crea y edita módulos, pasillos, estanterías, etiquetas, patios, sectores, filas, posiciones, niveles, ubicaciones, categorías, tipos de pieza, piezas, vehículos y movimientos. No elimina, no gestiona desguaces, usuarios, roles ni registros. |
-| operario | Consulta (`.ver`) de los 16 recursos y `movimientos.crear`. No elimina vehículos ni piezas. |
+| operario | Solo consulta de vehículos (con su historial de ubicaciones) y piezas de su sede. Sin movimientos ni módulos de gestión. |
 | sin rol | Puede iniciar sesión y ve el dashboard con aviso de cuenta pendiente. Los módulos internos devuelven 403. |
 
 Permisos por pantalla: 5 `usuarios.ver`; 6 `usuarios.ver` + `usuarios.asignar_roles` para modificar; 7–8 `vehiculos.ver`
@@ -165,8 +167,8 @@ es sintácticamente válido y que las clases responsive existen en el CSS compil
 2. **Roles y permisos (20):** solo lectura. La matriz de referencia es `RolePermissionSeeder`; editarla desde la web se pisaría al volver a sembrar.
 3. **Reglas de asignación de ubicación (19), supuestos a confirmar:** un vehículo tiene como máximo una ubicación vigente; fechas sin solapamiento (la anterior se cierra el día previo a la nueva); `fecha_fin ≥ fecha_inicio`; el nivel debe ser del mismo desguace que el vehículo; no se supera `capacidad_maxima` de la posición; un nivel aloja un vehículo vigente a la vez; no se repite el nivel vigente.
 4. **Bloqueos de borrado añadidos en la web** (la API hace borrado lógico simple): categoría con tipos o movimientos, tipo de pieza con piezas, desguace con dependientes (rama Jose-Antonio); elementos de almacén con hijos activos y niveles con vehículos vigentes (rama Antonio). Confirmar que es el comportamiento deseado.
-5. Los tipos de movimiento y los estados de vehículo/pieza son texto libre (como en la API); los formularios sugieren los valores existentes.
-6. Registrar un movimiento **no** modifica el stock de piezas (no hay relación en el EER).
+5. Los movimientos usan cinco acciones fijas (Entrada, Compra, Venta, Eliminar pieza, Mover pieza). El estado físico de la pieza se elige de una lista; el de vehículo sigue siendo texto libre.
+6. Cada movimiento se registra sobre una pieza y actualiza sus existencias por hueco y su stock en la misma transacción (ver `DOCUMENTACION_INVENTARIO.md`).
 7. Despliegue: las vistas usan Vite. `public/build` está en `.gitignore`, así que el servidor debe ejecutar `npm ci && npm run build`, o subir la carpeta compilada. Sin ello las páginas se muestran sin estilos.
 8. Traducción global de validaciones a español (`lang/es`) si se desea uniformidad.
 9. En la pantalla de categorías cada fila lleva un modal con todos los desplegables; con muchos vehículos puede pesar.

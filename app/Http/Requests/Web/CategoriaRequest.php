@@ -2,20 +2,24 @@
 
 namespace App\Http\Requests\Web;
 
-use App\Models\Desguace;
-use App\Models\Modulo;
-use App\Models\Vehiculo;
-use App\Rules\ExisteEnMiSede;
+use App\Http\Requests\Web\Concerns\MensajesDeValidacion;
+use App\Models\Categoria;
+use App\Support\Acceso;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 /**
- * Alta y edición de categorías. Reproduce las reglas de CategoriaApiController y añade
- * la coherencia con el esquema: el módulo debe pertenecer al desguace elegido.
+ * Alta y edición de categorías: solo se pide el nombre («Electricidad», «Carrocería», «Motor»…).
+ *
+ * La categoría pertenece al desguace del usuario, que asigna el servidor; el módulo ya no es obligatorio
+ * (ver la migración simplificar_categorias_y_tipos_de_pieza). El nombre no se repite dentro de la sede.
  */
 class CategoriaRequest extends FormRequest
 {
+    use MensajesDeValidacion;
+
     public function authorize(): bool
     {
         $permiso = $this->isMethod('POST') ? 'categorias.crear' : 'categorias.editar';
@@ -24,38 +28,24 @@ class CategoriaRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, ValidationRule|string>>
+     * @return array<string, array<int, ValidationRule|string|Unique>>
      */
     public function rules(): array
     {
+        $categoria = $this->route('categoria');
+
         return [
-            'nombre' => ['required', 'string', 'max:255'],
-            'id_desguace' => ['required', new ExisteEnMiSede(Desguace::class)],
-            'id_modulo' => ['required', new ExisteEnMiSede(Modulo::class)],
-            'id_vehiculo' => ['nullable', new ExisteEnMiSede(Vehiculo::class)],
-        ];
-    }
-
-    /**
-     * @return array<int, callable>
-     */
-    public function after(): array
-    {
-        return [
-            function (Validator $validator): void {
-                if ($validator->errors()->hasAny(['id_desguace', 'id_modulo'])) {
-                    return;
-                }
-
-                $moduloPerteneceAlDesguace = Modulo::query()
-                    ->whereKey($this->input('id_modulo'))
-                    ->where('id_desguace', $this->input('id_desguace'))
-                    ->exists();
-
-                if (! $moduloPerteneceAlDesguace) {
-                    $validator->errors()->add('id_modulo', 'El módulo seleccionado no pertenece al desguace elegido.');
-                }
-            },
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('categorias', 'nombre')
+                    ->where('id_desguace', Acceso::desguaceId($this->user()))
+                    ->whereNull('deleted_at')
+                    ->ignore($categoria instanceof Categoria ? $categoria->getKey() : null, 'categoria_id'),
+            ],
+            'id_desguace' => ['prohibited'],
+            '_modal' => ['nullable', 'string', 'max:100'],
         ];
     }
 
@@ -65,10 +55,9 @@ class CategoriaRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'required' => 'El campo :attribute es obligatorio.',
-            'string' => 'El campo :attribute debe ser un texto.',
-            'max.string' => 'El campo :attribute no puede superar los :max caracteres.',
-            'exists' => 'El valor seleccionado en :attribute no existe.',
+            ...$this->mensajesEnEspanol(['nombre']),
+            'nombre.unique' => 'Ya existe una categoría con ese nombre en tu desguace.',
+            'id_desguace.prohibited' => 'El desguace lo asigna Scrapex automáticamente.',
         ];
     }
 
@@ -77,11 +66,6 @@ class CategoriaRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return [
-            'nombre' => 'nombre',
-            'id_desguace' => 'desguace',
-            'id_modulo' => 'módulo',
-            'id_vehiculo' => 'vehículo',
-        ];
+        return ['nombre' => 'nombre'];
     }
 }

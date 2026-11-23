@@ -5,56 +5,24 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\CategoriaRequest;
 use App\Models\Categoria;
-use App\Models\Desguace;
-use App\Models\Modulo;
-use App\Models\TipoPieza;
-use App\Models\Vehiculo;
-use App\Support\OpcionesCategorias;
+use App\Support\Acceso;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+/**
+ * Categorías: alta y listado. Los tipos se gestionan en «Tipos de pieza» y las piezas en «Piezas».
+ */
 class CategoriaController extends Controller
 {
-    /**
-     * Listado con buscador, filtro por desguace y datos de los modales de alta y edición.
-     */
     public function index(Request $request): View
     {
-        $busqueda = $this->textoDeConsulta($request, 'q');
-        $desguaceId = ctype_digit($this->textoDeConsulta($request, 'desguace')) ? (int) $request->query('desguace') : null;
+        $valor = $request->query('q');
+        $busqueda = is_string($valor) ? trim($valor) : '';
 
         $categorias = Categoria::query()
-            ->with([
-                'desguace' => fn ($relacion) => $relacion->withTrashed(),
-                'modulo' => fn ($relacion) => $relacion->withTrashed(),
-                'vehiculo' => fn ($relacion) => $relacion->withTrashed(),
-                'tiposPieza' => fn ($relacion) => $relacion
-                    ->withCount('piezas')
-                    ->when($busqueda !== '', fn ($tipos) => $tipos->where(function ($grupo) use ($busqueda): void {
-                        $grupo->where('nombre', 'like', "%{$busqueda}%")
-                            ->orWhere('marca', 'like', "%{$busqueda}%")
-                            ->orWhere('modelo', 'like', "%{$busqueda}%")
-                            ->orWhere('fabricante', 'like', "%{$busqueda}%")
-                            ->orWhere('categoria', 'like', "%{$busqueda}%");
-                    }))
-                    ->orderBy('nombre'),
-            ])
             ->withCount(['tiposPieza', 'movimientos'])
-            ->when($busqueda !== '', fn ($consulta) => $consulta->where(function ($grupo) use ($busqueda): void {
-                $grupo->where('nombre', 'like', "%{$busqueda}%")
-                    ->orWhereHas('desguace', fn ($relacion) => $relacion->where('nombre', 'like', "%{$busqueda}%"))
-                    ->orWhereHas('modulo', fn ($relacion) => $relacion->where('nombre_modulo', 'like', "%{$busqueda}%"))
-                    ->orWhereHas('vehiculo', fn ($relacion) => $relacion->where('matricula', 'like', "%{$busqueda}%"))
-                    ->orWhereHas('tiposPieza', fn ($relacion) => $relacion->where(function ($tipos) use ($busqueda): void {
-                        $tipos->where('nombre', 'like', "%{$busqueda}%")
-                            ->orWhere('marca', 'like', "%{$busqueda}%")
-                            ->orWhere('modelo', 'like', "%{$busqueda}%")
-                            ->orWhere('fabricante', 'like', "%{$busqueda}%")
-                            ->orWhere('categoria', 'like', "%{$busqueda}%");
-                    }));
-            }))
-            ->when($desguaceId !== null, fn ($consulta) => $consulta->where('id_desguace', $desguaceId))
+            ->when($busqueda !== '', fn ($consulta) => $consulta->where('nombre', 'like', "%{$busqueda}%"))
             ->orderBy('nombre')
             ->orderBy('categoria_id')
             ->paginate(15)
@@ -62,20 +30,17 @@ class CategoriaController extends Controller
 
         return view('categorias.index', [
             'categorias' => $categorias,
-            'desguaces' => Desguace::query()->orderBy('nombre')->pluck('nombre', 'id_desguace')->all(),
-            'modulos' => $this->opcionesDeModulos(),
-            'vehiculos' => $this->opcionesDeVehiculos(),
-            'opcionesCategorias' => OpcionesCategorias::paraSelect(),
-            'categoriasTexto' => TipoPieza::query()->distinct()->orderBy('categoria')->pluck('categoria')->all(),
-            'filtros' => ['q' => $busqueda, 'desguace' => $desguaceId],
-            'hayFiltros' => $busqueda !== '' || $desguaceId !== null,
+            'filtros' => ['q' => $busqueda],
+            'hayFiltros' => $busqueda !== '',
         ]);
     }
 
     public function store(CategoriaRequest $request): RedirectResponse
     {
         $categoria = new Categoria;
-        $categoria->fill($request->validated() + ['id_vehiculo' => null]);
+        $categoria->nombre = $request->validated('nombre');
+        // La categoría pertenece al desguace del usuario: lo asigna el servidor.
+        $categoria->id_desguace = Acceso::desguaceId($request->user());
         $categoria->save();
 
         return redirect()
@@ -85,7 +50,7 @@ class CategoriaController extends Controller
 
     public function update(CategoriaRequest $request, Categoria $categoria): RedirectResponse
     {
-        $categoria->fill($request->validated() + ['id_vehiculo' => null]);
+        $categoria->nombre = $request->validated('nombre');
         $categoria->save();
 
         return redirect()
@@ -93,10 +58,6 @@ class CategoriaController extends Controller
             ->with('success', 'Categoría actualizada correctamente.');
     }
 
-    /**
-     * Borrado lógico. Se rechaza si la categoría tiene tipos de pieza o movimientos activos,
-     * igual que haría la clave foránea (restrictOnDelete) con un borrado físico: así no quedan huérfanos.
-     */
     public function destroy(Categoria $categoria): RedirectResponse
     {
         if ($categoria->tiposPieza()->exists() || $categoria->movimientos()->exists()) {
@@ -110,43 +71,5 @@ class CategoriaController extends Controller
         return redirect()
             ->route('categorias.index')
             ->with('success', 'Categoría eliminada correctamente.');
-    }
-
-    /**
-     * Módulos con el formato [id_modulo => "Módulo · Desguace"] para elegir uno del desguace seleccionado.
-     *
-     * @return array<int, string>
-     */
-    private function opcionesDeModulos(): array
-    {
-        return Modulo::query()
-            ->with('desguace')
-            ->orderBy('nombre_modulo')
-            ->get()
-            ->mapWithKeys(fn (Modulo $modulo): array => [
-                $modulo->id_modulo => $modulo->nombre_modulo.' · '.($modulo->desguace?->nombre ?? 'Sin desguace'),
-            ])
-            ->all();
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function opcionesDeVehiculos(): array
-    {
-        return Vehiculo::query()
-            ->orderBy('matricula')
-            ->get(['id_vehiculo', 'matricula', 'marca', 'modelo'])
-            ->mapWithKeys(fn (Vehiculo $vehiculo): array => [
-                $vehiculo->id_vehiculo => "{$vehiculo->matricula} · {$vehiculo->marca} {$vehiculo->modelo}",
-            ])
-            ->all();
-    }
-
-    private function textoDeConsulta(Request $request, string $clave): string
-    {
-        $valor = $request->query($clave);
-
-        return is_string($valor) ? trim($valor) : '';
     }
 }
